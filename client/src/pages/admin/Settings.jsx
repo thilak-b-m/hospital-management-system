@@ -2,7 +2,7 @@ import { useState } from 'react';
 import AdminLayout from '../../components/layout/AdminLayout';
 import { IcoSettings, IcoMail, IcoPhone, IcoHome } from '../../components/ui/Icons';
 
-const CATS = ['General Settings','System Settings','Email Settings','SMS Settings','Payment Settings','Backup & Restore','Security Settings'];
+const CATS = ['General Settings','System Settings','Email Settings','SMS Settings','Backup & Restore','Security Settings'];
 
 function Toggle({ on, onToggle }) {
   return (

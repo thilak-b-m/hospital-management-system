@@ -7,7 +7,6 @@ const INIT = [
   { id:2, type:'patient',     title:'New patient registered', body:'Priya Mehta has registered as a new patient in the system.',                  time:'15 min ago', read:false, Icon:IcoUsers,    color:'#dcfce7', ic:'#15803d'  },
   { id:3, type:'report',      title:'Lab report uploaded',    body:'Blood test report for Amit Verma has been uploaded and is ready for review.',  time:'1 hr ago',   read:false, Icon:IcoReport,   color:'#fef9c3', ic:'#92400e'  },
   { id:4, type:'doctor',      title:'Doctor schedule updated',body:'Dr. Neha Verma updated her availability for next week.',                       time:'2 hr ago',   read:false, Icon:IcoUser,     color:'#ede9fe', ic:'#7c3aed'  },
-  { id:5, type:'payment',     title:'Payment received',       body:'Payment of ₹4,500 received from Vikram Singh for MRI Scan.',                  time:'3 hr ago',   read:true,  Icon:IcoReport,   color:'#d1fae5', ic:'#065f46'  },
   { id:6, type:'appointment', title:'Appointment cancelled',  body:'Sneha Iyer cancelled her appointment scheduled for May 22, 2025.',            time:'5 hr ago',   read:true,  Icon:IcoCalendar, color:'#fee2e2', ic:'#dc2626'  },
   { id:7, type:'system',      title:'System backup completed',body:'Automatic system backup was completed successfully.',                          time:'1 day ago',  read:true,  Icon:IcoBell,     color:'#f1f5f9', ic:'#64748b'  },
 ];

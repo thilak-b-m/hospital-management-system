@@ -1,7 +1,8 @@
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   IcoCross, IcoDashboard, IcoCalPlus, IcoCalendar,
-  IcoPrescription, IcoUser, IcoLock, IcoLogout, IcoBell, IcoMenu, IcoChevronRight
+  IcoPrescription, IcoUser, IcoMessage, IcoStethoscope,
+  IcoLogout, IcoBell, IcoMenu, IcoChevronRight
 } from '../ui/Icons';
 
 const NAV = [
@@ -9,8 +10,9 @@ const NAV = [
   { to: '/patient/book-appointment', label: 'Book Appointment', Icon: IcoCalPlus },
   { to: '/patient/appointments', label: 'My Appointments', Icon: IcoCalendar },
   { to: '/patient/prescriptions', label: 'My Prescriptions', Icon: IcoPrescription },
+  { to: '/patient/messages', label: 'Messages', Icon: IcoMessage },
+  { to: '/patient/services', label: 'Services', Icon: IcoStethoscope },
   { to: '/patient/profile', label: 'My Profile', Icon: IcoUser },
-  { to: '/patient/change-password', label: 'Change Password', Icon: IcoLock },
 ];
 
 const TITLES = {
@@ -18,8 +20,9 @@ const TITLES = {
   '/patient/book-appointment': 'Book Appointment',
   '/patient/appointments': 'My Appointments',
   '/patient/prescriptions': 'My Prescriptions',
+  '/patient/messages': 'Messages',
+  '/patient/services': 'Services',
   '/patient/profile': 'My Profile',
-  '/patient/change-password': 'Change Password',
   '/patient/doctor-details': 'Doctor Details',
 };
 
