@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import AdminLayout from '../../components/layout/AdminLayout';
-import { IcoPlus, IcoSearch, IcoEye, IcoEdit, IcoTrash, IcoChevronLeft, IcoChevronRight } from '../../components/ui/Icons';
+import { IcoPlus, IcoSearch, IcoEye, IcoEdit, IcoTrash, IcoChevronLeft, IcoChevronRight, IcoEyeOff } from '../../components/ui/Icons';
 
 const DOCTORS = [
-  { name:'Dr. Arjun Patel',  dept:'Cardiology',  exp:'10 Years', email:'arjunpatel@citycare.com',  status:'Active',   initials:'AP' },
-  { name:'Dr. Neha Verma',   dept:'Dermatology', exp:'8 Years',  email:'nehaverma@citycare.com',   status:'Active',   initials:'NV' },
-  { name:'Dr. Rohit Kumar',  dept:'Orthopedics', exp:'12 Years', email:'rohitkumar@citycare.com',  status:'Active',   initials:'RK' },
-  { name:'Dr. Anjali Singh', dept:'Neurology',   exp:'6 Years',  email:'anjalisingh@citycare.com', status:'Active',   initials:'AS' },
-  { name:'Dr. Vivek Mishra', dept:'Pediatrics',  exp:'7 Years',  email:'vivekmishra@citycare.com', status:'Inactive', initials:'VM' },
-  { name:'Dr. Pooja Shah',   dept:'Gynecology',  exp:'11 Years', email:'poojashah@citycare.com',   status:'Active',   initials:'PS' },
+  { name:'Dr. Arjun Patel',  dept:'Cardiology',  exp:'10 Years', email:'arjunpatel@citycare.com',  phone:'9876543210', status:'Active',   initials:'AP' },
+  { name:'Dr. Neha Verma',   dept:'Dermatology', exp:'8 Years',  email:'nehaverma@citycare.com',   phone:'9876543211', status:'Active',   initials:'NV' },
+  { name:'Dr. Rohit Kumar',  dept:'Orthopedics', exp:'12 Years', email:'rohitkumar@citycare.com',  phone:'9876543212', status:'Active',   initials:'RK' },
+  { name:'Dr. Anjali Singh', dept:'Neurology',   exp:'6 Years',  email:'anjalisingh@citycare.com', phone:'9876543213', status:'Active',   initials:'AS' },
+  { name:'Dr. Vivek Mishra', dept:'Pediatrics',  exp:'7 Years',  email:'vivekmishra@citycare.com', phone:'9876543214', status:'Inactive', initials:'VM' },
+  { name:'Dr. Pooja Shah',   dept:'Gynecology',  exp:'11 Years', email:'poojashah@citycare.com',   phone:'9876543215', status:'Active',   initials:'PS' },
 ];
 
 export default function AdminDoctors() {
@@ -17,7 +17,8 @@ export default function AdminDoctors() {
   const [statusF, setStatusF] = useState('All Status');
   const [list, setList]       = useState(DOCTORS);
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm]       = useState({ name:'', dept:'Cardiology', exp:'', email:'', status:'Active' });
+  const [showPwd, setShowPwd]     = useState(false);
+  const [form, setForm]           = useState({ name:'', dept:'Cardiology', exp:'', email:'', phone:'', password:'', status:'Active' });
 
   const filtered = list.filter(d => {
     const s = d.name.toLowerCase().includes(search.toLowerCase()) || d.email.toLowerCase().includes(search.toLowerCase());
@@ -31,7 +32,8 @@ export default function AdminDoctors() {
     const initials = form.name.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
     setList(l => [...l, { ...form, initials }]);
     setShowModal(false);
-    setForm({ name:'', dept:'Cardiology', exp:'', email:'', status:'Active' });
+    setShowPwd(false);
+    setForm({ name:'', dept:'Cardiology', exp:'', email:'', phone:'', password:'', status:'Active' });
   };
 
   return (
@@ -65,7 +67,7 @@ export default function AdminDoctors() {
         <div style={{ overflowX:'auto' }}>
           <table className="data-table">
             <thead>
-              <tr><th>Doctor</th><th>Department</th><th>Experience</th><th>Email</th><th>Status</th><th>Actions</th></tr>
+              <tr><th>Doctor</th><th>Department</th><th>Experience</th><th>Email</th><th>Phone</th><th>Status</th><th>Actions</th></tr>
             </thead>
             <tbody>
               {filtered.map((d,i)=>(
@@ -79,6 +81,7 @@ export default function AdminDoctors() {
                   <td style={{ fontSize:13 }}>{d.dept}</td>
                   <td style={{ fontSize:13, color:'#64748b' }}>{d.exp}</td>
                   <td style={{ fontSize:13, color:'#64748b' }}>{d.email}</td>
+                  <td style={{ fontSize:13 }}>{d.phone || '—'}</td>
                   <td><span className={`badge ${d.status==='Active'?'badge-active':'badge-inactive'}`}>{d.status}</span></td>
                   <td>
                     <div style={{ display:'flex', gap:6 }}>
@@ -106,33 +109,119 @@ export default function AdminDoctors() {
 
       {/* Add Doctor Modal */}
       {showModal && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:200 }}>
-          <div className="card" style={{ width:460, maxWidth:'90vw' }}>
-            <div style={{ fontWeight:700, fontSize:17, marginBottom:20 }}>Add New Doctor</div>
-            <form onSubmit={addDoctor} style={{ display:'flex', flexDirection:'column', gap:14 }}>
-              <div className="form-group">
-                <label className="form-label">Full Name</label>
-                <input className="form-input" value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))} placeholder="Dr. First Last" required/>
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:200, padding:16 }}>
+          <div className="card" style={{ width:520, maxWidth:'95vw', maxHeight:'90vh', overflowY:'auto' }}>
+
+            {/* Modal header */}
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
+              <div>
+                <div style={{ fontWeight:700, fontSize:18 }}>Add New Doctor</div>
+                <div style={{ fontSize:13, color:'#64748b', marginTop:2 }}>Fill in the details to create a doctor account.</div>
               </div>
+              <button type="button" onClick={()=>{ setShowModal(false); setShowPwd(false); }}
+                style={{ background:'#f1f5f9', border:'none', borderRadius:8, cursor:'pointer', width:32, height:32, fontSize:18, color:'#64748b', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                ×
+              </button>
+            </div>
+
+            {/* Divider */}
+            <div style={{ height:1, background:'#f1f5f9', marginBottom:20 }}/>
+
+            <form onSubmit={addDoctor} style={{ display:'flex', flexDirection:'column', gap:16 }}>
+
+              {/* Personal Info section */}
+              <div style={{ fontSize:12, fontWeight:600, color:'#94a3b8', letterSpacing:'0.8px', textTransform:'uppercase', marginBottom:2 }}>Personal Information</div>
+
+              <div className="form-group">
+                <label className="form-label">Full Name <span style={{ color:'#ef4444' }}>*</span></label>
+                <input className="form-input" value={form.name}
+                  onChange={e=>setForm(p=>({...p,name:e.target.value}))}
+                  placeholder="e.g. Dr. Arjun Patel" required/>
+              </div>
+
               <div className="grid-2">
                 <div className="form-group">
-                  <label className="form-label">Department</label>
+                  <label className="form-label">Department <span style={{ color:'#ef4444' }}>*</span></label>
                   <select className="form-select" value={form.dept} onChange={e=>setForm(p=>({...p,dept:e.target.value}))}>
-                    {['Cardiology','Dermatology','Neurology','Orthopedics','Pediatrics','Gynecology'].map(d=><option key={d}>{d}</option>)}
+                    {['Cardiology','Dermatology','Neurology','Orthopedics','Pediatrics','Gynecology','General Medicine','Radiology'].map(d=><option key={d}>{d}</option>)}
                   </select>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Experience</label>
-                  <input className="form-input" value={form.exp} onChange={e=>setForm(p=>({...p,exp:e.target.value}))} placeholder="e.g. 5 Years" required/>
+                  <label className="form-label">Experience <span style={{ color:'#ef4444' }}>*</span></label>
+                  <input className="form-input" value={form.exp}
+                    onChange={e=>setForm(p=>({...p,exp:e.target.value}))}
+                    placeholder="e.g. 5 Years" required/>
                 </div>
               </div>
+
+              {/* Divider */}
+              <div style={{ height:1, background:'#f1f5f9', margin:'2px 0' }}/>
+              <div style={{ fontSize:12, fontWeight:600, color:'#94a3b8', letterSpacing:'0.8px', textTransform:'uppercase', marginBottom:2 }}>Contact &amp; Login Credentials</div>
+
               <div className="form-group">
-                <label className="form-label">Email</label>
-                <input className="form-input" type="email" value={form.email} onChange={e=>setForm(p=>({...p,email:e.target.value}))} placeholder="doctor@citycare.com" required/>
+                <label className="form-label">Email Address <span style={{ color:'#ef4444' }}>*</span></label>
+                <input className="form-input" type="email" value={form.email}
+                  onChange={e=>setForm(p=>({...p,email:e.target.value}))}
+                  placeholder="doctor@citycare.com" required/>
               </div>
-              <div style={{ display:'flex', gap:10, marginTop:4 }}>
-                <button type="submit" className="btn-primary" style={{ flex:1, justifyContent:'center' }}>Add Doctor</button>
-                <button type="button" className="btn-outline" style={{ flex:1 }} onClick={()=>setShowModal(false)}>Cancel</button>
+
+              <div className="form-group">
+                <label className="form-label">Phone Number <span style={{ color:'#ef4444' }}>*</span></label>
+                <input className="form-input" type="tel" value={form.phone}
+                  onChange={e=>setForm(p=>({...p,phone:e.target.value}))}
+                  placeholder="e.g. 9876543210" required
+                  pattern="[0-9]{10,15}"
+                  title="Enter a valid phone number (10–15 digits)"/>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Login Password <span style={{ color:'#ef4444' }}>*</span></label>
+                <div style={{ position:'relative' }}>
+                  <input className="form-input"
+                    type={showPwd ? 'text' : 'password'}
+                    value={form.password}
+                    onChange={e=>setForm(p=>({...p,password:e.target.value}))}
+                    placeholder="Min. 8 characters"
+                    required minLength={8}
+                    style={{ paddingRight:42 }}/>
+                  <button type="button" onClick={()=>setShowPwd(p=>!p)}
+                    style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'#94a3b8', display:'flex', alignItems:'center' }}>
+                    {showPwd ? <IcoEyeOff /> : <IcoEye />}
+                  </button>
+                </div>
+                <div style={{ fontSize:11, color:'#94a3b8', marginTop:4 }}>
+                  The doctor will use this email &amp; password to log in.
+                </div>
+              </div>
+
+              {/* Status */}
+              <div className="form-group">
+                <label className="form-label">Account Status</label>
+                <div style={{ display:'flex', gap:10 }}>
+                  {['Active','Inactive'].map(s=>(
+                    <label key={s} style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', fontSize:14 }}>
+                      <input type="radio" name="status" value={s}
+                        checked={form.status===s}
+                        onChange={()=>setForm(p=>({...p,status:s}))}
+                        style={{ accentColor:'var(--primary)', width:15, height:15 }}/>
+                      <span style={{ color: s==='Active'?'#15803d':'#dc2626', fontWeight:500 }}>{s}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div style={{ height:1, background:'#f1f5f9' }}/>
+
+              {/* Actions */}
+              <div style={{ display:'flex', gap:10 }}>
+                <button type="submit" className="btn-primary" style={{ flex:1, justifyContent:'center', padding:'11px' }}>
+                  <IcoPlus size={14}/> Add Doctor
+                </button>
+                <button type="button" className="btn-outline" style={{ flex:1, padding:'11px' }}
+                  onClick={()=>{ setShowModal(false); setShowPwd(false); }}>
+                  Cancel
+                </button>
               </div>
             </form>
           </div>
