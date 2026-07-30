@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { IcoEye, IcoEyeOff, IcoUser, IcoStethoscope, IcoSettings } from '../../components/ui/Icons';
+import { useAuth } from '../../context/AuthContext';
 
 const ROLES = [
-  { key: 'patient',  label: 'Patient',  Icon: IcoUser,         redirect: '/patient/dashboard' },
-  { key: 'doctor',   label: 'Doctor',   Icon: IcoStethoscope,  redirect: '/doctor/dashboard'  },
-  { key: 'admin',    label: 'Admin',    Icon: IcoSettings,     redirect: '/admin/dashboard'   },
+  { key: 'patient', label: 'Patient',  Icon: IcoUser,        redirect: '/patient/dashboard' },
+  { key: 'doctor',  label: 'Doctor',   Icon: IcoStethoscope, redirect: '/doctor/dashboard'  },
+  { key: 'admin',   label: 'Admin',    Icon: IcoSettings,    redirect: '/admin/dashboard'   },
 ];
 
 const HospitalSVG = () => (
@@ -24,21 +25,29 @@ const HospitalSVG = () => (
     <circle cx="22" cy="150" r="3" fill="rgba(255,255,255,0.7)"/>
     <circle cx="52" cy="150" r="6" fill="rgba(255,255,255,0.4)"/>
     <circle cx="52" cy="150" r="3" fill="rgba(255,255,255,0.7)"/>
-    <ellipse cx="225" cy="128" rx="16" ry="20" fill="rgba(255,255,255,0.1)"/>
-    <rect x="223" y="140" width="4" height="10" fill="rgba(255,255,255,0.15)"/>
     <rect x="0" y="148" width="260" height="12" fill="rgba(255,255,255,0.08)"/>
   </svg>
 );
 
 export default function Login() {
   const navigate = useNavigate();
+  const { login, loading } = useAuth();
   const [role, setRole] = useState('patient');
   const [form, setForm] = useState({ email: '', password: '' });
   const [showPwd, setShowPwd] = useState(false);
+  const [error, setError] = useState('');
+
   const handle = e => setForm(p => ({ ...p, [e.target.name]: e.target.value }));
-  const submit = e => {
+
+  const submit = async (e) => {
     e.preventDefault();
-    navigate(ROLES.find(r => r.key === role).redirect);
+    setError('');
+    const result = await login(form.email, form.password, role);
+    if (result.success) {
+      navigate(ROLES.find(r => r.key === role).redirect);
+    } else {
+      setError(result.message);
+    }
   };
 
   return (
@@ -66,10 +75,9 @@ export default function Login() {
           <h2 style={{ fontSize:26, fontWeight:700, marginBottom:4 }}>Welcome Back</h2>
           <p style={{ color:'#64748b', fontSize:14, marginBottom:24 }}>Please login to your account</p>
 
-          {/* Role tabs */}
           <div style={{ display:'flex', gap:8, marginBottom:28, background:'#f1f5f9', borderRadius:10, padding:4 }}>
             {ROLES.map(({ key, label, Icon }) => (
-              <button key={key} type="button" onClick={() => setRole(key)}
+              <button key={key} type="button" onClick={() => { setRole(key); setError(''); }}
                 style={{
                   flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6,
                   padding:'8px 4px', borderRadius:8, border:'none', cursor:'pointer',
@@ -83,6 +91,12 @@ export default function Login() {
               </button>
             ))}
           </div>
+
+          {error && (
+            <div style={{ background:'#fee2e2', color:'#dc2626', borderRadius:8, padding:'10px 14px', marginBottom:16, fontSize:13, border:'1px solid #fecaca' }}>
+              {error}
+            </div>
+          )}
 
           <form onSubmit={submit} style={{ display:'flex', flexDirection:'column', gap:18 }}>
             <div className="form-group">
@@ -104,15 +118,10 @@ export default function Login() {
                   {showPwd ? <IcoEyeOff /> : <IcoEye />}
                 </button>
               </div>
-              <div style={{ textAlign:'right', marginTop:4 }}>
-                <Link to="/forgot-password" style={{ fontSize:13, color:'var(--primary)', textDecoration:'none', fontWeight:500 }}>
-                  Forgot Password?
-                </Link>
-              </div>
             </div>
-            <button type="submit" className="btn-primary"
-              style={{ width:'100%', justifyContent:'center', padding:'12px', fontSize:15 }}>
-              Login as {ROLES.find(r=>r.key===role).label}
+            <button type="submit" className="btn-primary" disabled={loading}
+              style={{ width:'100%', justifyContent:'center', padding:'12px', fontSize:15, opacity: loading ? 0.7 : 1 }}>
+              {loading ? 'Logging in...' : `Login as ${ROLES.find(r=>r.key===role).label}`}
             </button>
           </form>
 

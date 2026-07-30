@@ -1,0 +1,73 @@
+import Message from "../models/message.js";
+import User from "../models/user.js";
+import Doctor from "../models/doctor.js";
+
+// GET /api/messages/contacts — list of people this user has chatted with or can chat with
+export const getContacts = async (req, res) => {
+  try {
+    const { id, role } = req.user;
+
+    let contacts = [];
+
+    if (role === "patient") {
+      // Show all active doctors
+      const doctors = await Doctor.find()
+        .populate("user", "name email role status")
+        .sort({ department: 1 });
+      contacts = doctors
+        .filter((d) => d.user?.status === "Active")
+        .map((d) => ({
+          _id: d.user._id,
+          name: d.user.name,
+          role: "doctor",
+          sub: d.department,
+          doctorId: d._id,
+        }));
+    } else if (role === "doctor") {
+      // Show all patients who have appointments with this doctor
+      const doctor = await Doctor.findOne({ user: id });
+      if (!doctor) return res.status(404).json({ success: false, message: "Doctor not found" });
+
+      const { default: Appointment } = await import("../models/appointment.js");
+      const appts = await Appointment.find({ doctor: doctor._id })
+        .populate("patient", "name email role status patientId")
+        .sort({ appointmentDate: -1 });
+
+      const seen = new Set();
+      contacts = appts
+        .filter((a) => a.patient && !seen.has(String(a.patient._id)) && seen.add(String(a.patient._id)))
+        .map((a) => ({
+          _id: a.patient._id,
+          name: a.patient.name,
+          role: "patient",
+          sub: a.patient.patientId || "Patient",
+        }));
+    } else if (role === "admin") {
+      // Admin can chat with all doctors and patients
+      const users = await User.find({ role: { $in: ["doctor", "patient"] }, status: "Active" })
+        .select("name role")
+        .sort({ role: 1, name: 1 });
+      contacts = users.map((u) => ({ _id: u._id, name: u.name, role: u.role, sub: u.role }));
+    }
+
+    return res.status(200).json({ success: true, contacts });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// GET /api/messages/:contactId — fetch message history
+export const getMessages = async (req, res) => {
+  try {
+    const { id } = req.user;
+    const { contactId } = req.params;
+    const roomId = [id, contactId].sort().join("_");
+
+    const messages = await Message.find({ roomId }).sort({ createdAt: 1 }).limit(100);
+    return res.status(200).json({ success: true, messages });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};

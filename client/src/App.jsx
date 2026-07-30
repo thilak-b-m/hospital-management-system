@@ -11,6 +11,7 @@ import MyAppointments    from './pages/patient/MyAppointments';
 import DoctorDetails     from './pages/patient/DoctorDetails';
 import MyPrescriptions   from './pages/patient/MyPrescriptions';
 import MyProfile         from './pages/patient/MyProfile';
+import ChangePassword     from './pages/patient/ChangePassword';
 import PatientMessages    from './pages/patient/Messages';
 import PatientServices    from './pages/patient/Services';
 
@@ -35,9 +36,11 @@ import AdminPatients      from './pages/admin/Patients';
 import AdminAppointments  from './pages/admin/Appointments';
 import AdminDepartments   from './pages/admin/Departments';
 import AdminServices      from './pages/admin/Services';
+import AdminPayments      from './pages/admin/Payments';
 import AdminReports       from './pages/admin/Reports';
 import AdminSettings      from './pages/admin/Settings';
 import AdminNotifications from './pages/admin/Notifications';
+import AdminMessages      from './pages/admin/Messages';
 
 export default function App() {
   return (
@@ -53,6 +56,7 @@ export default function App() {
       <Route path="/patient/doctor-details"   element={<DoctorDetails />} />
       <Route path="/patient/prescriptions"    element={<MyPrescriptions />} />
       <Route path="/patient/profile"          element={<MyProfile />} />
+      <Route path="/patient/change-password"  element={<ChangePassword />} />
       <Route path="/patient/messages"         element={<PatientMessages />} />
       <Route path="/patient/services"         element={<PatientServices />} />
 
@@ -77,9 +81,11 @@ export default function App() {
       <Route path="/admin/appointments"  element={<AdminAppointments />} />
       <Route path="/admin/departments"   element={<AdminDepartments />} />
       <Route path="/admin/services"      element={<AdminServices />} />
+      <Route path="/admin/payments"      element={<AdminPayments />} />
       <Route path="/admin/reports"       element={<AdminReports />} />
       <Route path="/admin/settings"      element={<AdminSettings />} />
       <Route path="/admin/notifications" element={<AdminNotifications />} />
+      <Route path="/admin/messages"      element={<AdminMessages />} />
     </Routes>
   );
 }

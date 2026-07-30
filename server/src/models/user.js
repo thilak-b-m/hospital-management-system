@@ -32,6 +32,41 @@ const userSchema = new mongoose.Schema(
       enum: ["admin", "doctor", "patient"],
       default: "patient",
     },
+    
+    status: {
+      type: String,
+      enum: ["Active", "Inactive"],
+      default: "Active",
+    },
+
+    patientId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true,
+    },
+
+    dob: {
+      type: Date,
+    },
+
+    gender: {
+      type: String,
+      enum: ["Male", "Female", "Other", ""],
+      default: "",
+    },
+
+    address: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    emergencyContact: {
+      type: String,
+      trim: true,
+      default: "",
+    },
   },
   {
     timestamps: true,
