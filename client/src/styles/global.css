@@ -118,14 +118,14 @@ body {
 /* Layout */
 .layout { display: flex; }
 .main-content { margin-left: 220px; flex: 1; min-height: 100vh; }
-.page-body { padding: 24px; }
+.page-body { padding: 28px 28px 40px; }
 
 /* Cards */
 .card {
   background: white;
   border-radius: 12px;
   border: 1px solid #e2e8f0;
-  padding: 20px;
+  padding: 24px;
 }
 
 /* Stat cards */
@@ -133,7 +133,7 @@ body {
   background: white;
   border-radius: 12px;
   border: 1px solid #e2e8f0;
-  padding: 18px 20px;
+  padding: 20px 24px;
   display: flex;
   align-items: center;
   gap: 16px;
@@ -362,9 +362,9 @@ body {
 .section-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
 
 /* Grid helpers */
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
-.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
 
 @media (max-width: 1024px) {
   .grid-4 { grid-template-columns: repeat(2, 1fr); }

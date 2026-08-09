@@ -25,6 +25,11 @@ const buildRoleFilter = async (user) => {
 export const getPrescriptions = async (req, res) => {
   try {
     const filter = await buildRoleFilter(req.user);
+    // Allow doctor/admin to query prescriptions for a specific patient
+    const { patientId } = req.query;
+    if (patientId && (req.user.role === "doctor" || req.user.role === "admin")) {
+      filter.patient = patientId;
+    }
     const prescriptions = await withPrescriptionRelations(
       Prescription.find(filter).sort({ createdAt: -1 })
     );

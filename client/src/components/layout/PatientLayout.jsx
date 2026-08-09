@@ -43,7 +43,7 @@ export default function PatientLayout({ children }) {
     <div className="layout">
       <aside className="sidebar">
         <div className="sidebar-logo">
-          <IcoCross />
+          <img src="/shield-plus.svg" alt="Logo" />
           HMS
         </div>
         <nav className="sidebar-nav">

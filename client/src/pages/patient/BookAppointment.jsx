@@ -15,9 +15,14 @@ function parseTime(str) {
   return h * 60 + m;
 }
 
+function parseDateLocal(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
 function getAvailableTimesForDoctor(doctor, dateStr) {
   if (!doctor || !dateStr) return [];
-  const dayName = DAY_NAMES[new Date(dateStr).getDay()];
+  const dayName = DAY_NAMES[parseDateLocal(dateStr).getDay()];
   const slot = doctor.availability?.find(a => a.day === dayName);
   if (!slot || !slot.available || !slot.startTime || !slot.endTime) return [];
 
@@ -74,7 +79,7 @@ export default function BookAppointment() {
 
   const isDayOff = (dateStr) => {
     if (!selectedDoc || !dateStr) return false;
-    const dayName = DAY_NAMES[new Date(dateStr).getDay()];
+    const dayName = DAY_NAMES[parseDateLocal(dateStr).getDay()];
     const slot = selectedDoc.availability?.find(a => a.day === dayName);
     return !slot || !slot.available;
   };
@@ -150,12 +155,12 @@ export default function BookAppointment() {
                 min={new Date().toISOString().split('T')[0]} onChange={handle} required/>
               {form.date && dayOff && (
                 <div style={{ marginTop: 6, fontSize: 12, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <IcoBan /> Doctor is not available on {DAY_NAMES[new Date(form.date).getDay()]}s
+                  <IcoBan /> Doctor is not available on {DAY_NAMES[parseDateLocal(form.date).getDay()]}s
                 </div>
               )}
               {form.date && !dayOff && availableTimes.length > 0 && (
                 <div style={{ marginTop: 6, fontSize: 12, color: '#15803d', display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <IcoCheck size={12} /> Available on {DAY_NAMES[new Date(form.date).getDay()]}
+                  <IcoCheck size={12} /> Available on {DAY_NAMES[parseDateLocal(form.date).getDay()]}
                 </div>
               )}
             </div>

@@ -64,8 +64,9 @@ export const getMessages = async (req, res) => {
     const { contactId } = req.params;
     const roomId = [id, contactId].sort().join("_");
 
-    const messages = await Message.find({ roomId }).sort({ createdAt: 1 }).limit(100);
-    return res.status(200).json({ success: true, messages });
+    const messages = await Message.find({ roomId }).sort({ createdAt: 1 }).limit(100).lean();
+    const normalized = messages.map(m => ({ ...m, _id: String(m._id), sender: String(m.sender) }));
+    return res.status(200).json({ success: true, messages: normalized });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ success: false, message: "Server error" });

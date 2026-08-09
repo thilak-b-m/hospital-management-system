@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { IcoSearch, IcoSend } from '../ui/Icons';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../api/axios';
-import { connectSocket, getSocket } from '../../utils/socket';
+import { connectSocket, disconnectSocket } from '../../utils/socket';
 
 export default function ChatUI({ Layout }) {
   const { user, token } = useAuth();
@@ -15,57 +15,111 @@ export default function ChatUI({ Layout }) {
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const bottomRef = useRef(null);
   const socketRef = useRef(null);
+  const activeIdRef = useRef(null);
+  const myIdRef = useRef('');
 
-  // Connect socket once
+  // Keep refs in sync
+  useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
+  useEffect(() => { myIdRef.current = String(user?.id || user?._id || ''); }, [user]);
+
+  // Connect socket once per token, clean up on unmount
   useEffect(() => {
-    socketRef.current = connectSocket(token);
-    const sock = socketRef.current;
+    if (!token) return;
 
-    sock.on('receive_message', (msg) => {
+    const sock = connectSocket(token);
+    socketRef.current = sock;
+
+    const handleMessage = (msg) => {
+      const myId = myIdRef.current;
+      const contactId = activeIdRef.current;
+      if (!contactId || !myId) return;
+
+      // Compute expected roomId for current open conversation
+      const expectedRoom = [myId, contactId].sort().join('_');
+      if (msg.roomId !== expectedRoom) return;
+
       setMessages(prev => {
-        // avoid duplicates
-        if (prev.find(m => m._id === msg._id)) return prev;
+        // Replace optimistic message from me with confirmed one
+        const optIdx = prev.findIndex(
+          m => m.isOptimistic && String(m.sender) === myId && m.text === msg.text
+        );
+        if (optIdx !== -1) {
+          const next = [...prev];
+          next[optIdx] = { ...msg, isOptimistic: false };
+          return next;
+        }
+        // Deduplicate by _id
+        if (prev.some(m => String(m._id) === String(msg._id))) return prev;
         return [...prev, msg];
       });
+    };
+
+    sock.on('receive_message', handleMessage);
+
+    // Re-join room if socket reconnects mid-session
+    sock.on('connect', () => {
+      if (activeIdRef.current) {
+        sock.emit('join_room', activeIdRef.current);
+      }
     });
 
     return () => {
-      sock.off('receive_message');
+      sock.off('receive_message', handleMessage);
+      sock.off('connect');
     };
   }, [token]);
 
   // Load contacts
   useEffect(() => {
-    api.get('/messages/contacts').then(res => {
-      setContacts(res.data.contacts || []);
-    }).catch(console.error).finally(() => setLoadingContacts(false));
+    api.get('/messages/contacts')
+      .then(res => setContacts(res.data.contacts || []))
+      .catch(console.error)
+      .finally(() => setLoadingContacts(false));
   }, []);
 
-  // Load messages when active contact changes
+  // Join room + load history when active contact changes
   useEffect(() => {
     if (!activeId) return;
+
     setLoadingMsgs(true);
     setMessages([]);
 
-    // Join socket room
+    // Emit join_room with the contact's user _id
     socketRef.current?.emit('join_room', activeId);
 
-    api.get(`/messages/${activeId}`).then(res => {
-      setMessages(res.data.messages || []);
-    }).catch(console.error).finally(() => setLoadingMsgs(false));
+    api.get(`/messages/${activeId}`)
+      .then(res => setMessages(res.data.messages || []))
+      .catch(console.error)
+      .finally(() => setLoadingMsgs(false));
   }, [activeId]);
 
-  // Scroll to bottom on new messages
+  // Auto-scroll on new messages
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const send = (e) => {
+  const send = useCallback((e) => {
     e.preventDefault();
-    if (!text.trim() || !activeId) return;
-    socketRef.current?.emit('send_message', { contactId: activeId, text: text.trim() });
+    const trimmed = text.trim();
+    if (!trimmed || !activeId || !socketRef.current?.connected) return;
+
+    const myId = myIdRef.current;
+
+    // Optimistic message shown immediately
+    const tempMsg = {
+      _id: `temp_${Date.now()}`,
+      sender: myId,
+      senderName: user?.name || '',
+      senderRole: user?.role || '',
+      text: trimmed,
+      createdAt: new Date().toISOString(),
+      isOptimistic: true,
+    };
+    setMessages(prev => [...prev, tempMsg]);
     setText('');
-  };
+
+    socketRef.current.emit('send_message', { contactId: activeId, text: trimmed });
+  }, [text, activeId, user]);
 
   const activeContact = contacts.find(c => String(c._id) === String(activeId));
   const filteredContacts = contacts.filter(c =>
@@ -82,11 +136,11 @@ export default function ChatUI({ Layout }) {
     return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
   };
 
-  const isMine = (msg) => String(msg.sender) === String(user?.id);
+  const isMine = (msg) => String(msg.sender) === myIdRef.current;
 
   return (
     <Layout>
-      <div className="card" style={{ padding: 0, height: 'calc(100vh - 140px)', display: 'flex', overflow: 'hidden' }}>
+      <div className="card" style={{ padding: 0, height: 'calc(100vh - 148px)', display: 'flex', overflow: 'hidden' }}>
 
         {/* Contact list */}
         <div style={{ width: 280, borderRight: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
@@ -97,7 +151,7 @@ export default function ChatUI({ Layout }) {
               </span>
               <input value={search} onChange={e => setSearch(e.target.value)}
                 placeholder="Search conversations..."
-                style={{ paddingLeft: 28, height: 34, border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 12, outline: 'none', width: '100%', background: '#f8fafc' }}/>
+                style={{ paddingLeft: 28, height: 34, border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 12, outline: 'none', width: '100%', background: '#f8fafc' }} />
             </div>
           </div>
 
@@ -111,10 +165,12 @@ export default function ChatUI({ Layout }) {
               const isActive = String(c._id) === String(activeId);
               return (
                 <div key={c._id} onClick={() => setActiveId(String(c._id))}
-                  style={{ display: 'flex', gap: 10, padding: '12px 14px', cursor: 'pointer',
+                  style={{
+                    display: 'flex', gap: 10, padding: '12px 14px', cursor: 'pointer',
                     borderBottom: '1px solid #f8fafc',
                     background: isActive ? '#eff6ff' : 'white',
-                    borderLeft: isActive ? '3px solid var(--primary)' : '3px solid transparent' }}>
+                    borderLeft: isActive ? '3px solid var(--primary)' : '3px solid transparent',
+                  }}>
                   <div className="doc-avatar" style={{ width: 40, height: 40, flexShrink: 0, fontSize: 13 }}>{initials}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, fontSize: 13 }}>{c.name}</div>
@@ -127,7 +183,7 @@ export default function ChatUI({ Layout }) {
         </div>
 
         {/* Chat area */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           {!activeId ? (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 14 }}>
               Select a conversation to start chatting
@@ -135,7 +191,7 @@ export default function ChatUI({ Layout }) {
           ) : (
             <>
               {/* Header */}
-              <div style={{ padding: '14px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ padding: '14px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
                 <div className="doc-avatar">
                   {activeContact?.name?.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?'}
                 </div>
@@ -143,13 +199,16 @@ export default function ChatUI({ Layout }) {
                   <div style={{ fontWeight: 600, fontSize: 14 }}>{activeContact?.name}</div>
                   <div style={{ fontSize: 12, color: '#64748b', textTransform: 'capitalize' }}>{activeContact?.sub || activeContact?.role}</div>
                 </div>
-                <div style={{ marginLeft: 'auto', width: 8, height: 8, borderRadius: '50%', background: '#22c55e' }} title="Online"/>
+                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#22c55e' }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e' }} />
+                  Online
+                </div>
               </div>
 
               {/* Messages */}
-              <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {loadingMsgs ? (
-                  <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>Loading messages...</div>
+                  <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13, marginTop: 40 }}>Loading messages...</div>
                 ) : messages.length === 0 ? (
                   <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13, marginTop: 40 }}>
                     No messages yet. Say hello!
@@ -157,41 +216,55 @@ export default function ChatUI({ Layout }) {
                 ) : messages.map((m, i) => {
                   const mine = isMine(m);
                   return (
-                    <div key={m._id || i} style={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start' }}>
+                    <div key={m._id || i} style={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start', alignItems: 'flex-end', gap: 8 }}>
                       {!mine && (
-                        <div className="doc-avatar" style={{ width: 28, height: 28, fontSize: 10, marginRight: 8, flexShrink: 0, alignSelf: 'flex-end' }}>
+                        <div className="doc-avatar" style={{ width: 30, height: 30, fontSize: 11, flexShrink: 0 }}>
                           {m.senderName?.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?'}
                         </div>
                       )}
-                      <div style={{
-                        maxWidth: '65%', padding: '10px 14px', borderRadius: 12,
-                        background: mine ? 'var(--primary)' : '#f1f5f9',
-                        color: mine ? 'white' : '#1e293b',
-                        borderBottomRightRadius: mine ? 2 : 12,
-                        borderBottomLeftRadius: mine ? 12 : 2,
-                      }}>
+                      <div style={{ maxWidth: '65%', display: 'flex', flexDirection: 'column', alignItems: mine ? 'flex-end' : 'flex-start' }}>
                         {!mine && (
-                          <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 3, opacity: 0.7 }}>{m.senderName}</div>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b', marginBottom: 3, paddingLeft: 4 }}>{m.senderName}</div>
                         )}
-                        <div style={{ fontSize: 14, lineHeight: 1.5 }}>{m.text}</div>
-                        <div style={{ fontSize: 11, opacity: 0.6, marginTop: 4, textAlign: mine ? 'right' : 'left' }}>
+                        <div style={{
+                          padding: '10px 14px',
+                          borderRadius: 16,
+                          background: mine ? 'var(--primary)' : '#f1f5f9',
+                          color: mine ? 'white' : '#1e293b',
+                          borderBottomRightRadius: mine ? 4 : 16,
+                          borderBottomLeftRadius: mine ? 16 : 4,
+                          fontSize: 14,
+                          lineHeight: 1.5,
+                          wordBreak: 'break-word',
+                          opacity: m.isOptimistic ? 0.7 : 1,
+                        }}>
+                          {m.text}
+                        </div>
+                        <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 3, paddingLeft: 4, paddingRight: 4 }}>
                           {formatTime(m.createdAt)}
+                          {m.isOptimistic && <span style={{ marginLeft: 4, fontSize: 10 }}>sending...</span>}
                         </div>
                       </div>
+                      {mine && (
+                        <div className="doc-avatar" style={{ width: 30, height: 30, fontSize: 11, flexShrink: 0, background: '#dbeafe', color: 'var(--primary)' }}>
+                          {user?.name?.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase() || 'ME'}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
-                <div ref={bottomRef}/>
+                <div ref={bottomRef} />
               </div>
 
               {/* Input */}
               <form onSubmit={send}
-                style={{ padding: '12px 16px', borderTop: '1px solid #e2e8f0', display: 'flex', gap: 10, alignItems: 'center' }}>
+                style={{ padding: '12px 16px', borderTop: '1px solid #e2e8f0', display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
                 <input value={text} onChange={e => setText(e.target.value)}
                   placeholder="Type your message..."
-                  style={{ flex: 1, padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 24, fontSize: 14, outline: 'none', background: '#f8fafc' }}/>
+                  style={{ flex: 1, padding: '10px 16px', border: '1.5px solid #e2e8f0', borderRadius: 24, fontSize: 14, outline: 'none', background: '#f8fafc' }} />
                 <button type="submit" className="btn-primary"
-                  style={{ borderRadius: '50%', width: 40, height: 40, padding: 0, justifyContent: 'center', flexShrink: 0 }}>
+                  disabled={!text.trim()}
+                  style={{ borderRadius: '50%', width: 42, height: 42, padding: 0, justifyContent: 'center', flexShrink: 0, opacity: text.trim() ? 1 : 0.5 }}>
                   <IcoSend />
                 </button>
               </form>

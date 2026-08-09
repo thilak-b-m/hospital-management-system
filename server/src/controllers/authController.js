@@ -69,13 +69,14 @@ export const registerUser = async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    const patientId = await nextPatientId();
     const user = await User.create({
       name,
       email,
       phone,
       password: hashedPassword,
       role: "patient",
-      patientId: await nextPatientId(),
+      patientId,
       dob,
       gender,
       address,

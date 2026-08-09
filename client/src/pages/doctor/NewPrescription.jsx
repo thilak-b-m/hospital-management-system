@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import DoctorLayout from '../../components/layout/DoctorLayout';
 import { IcoPlus, IcoTrash, IcoPrint } from '../../components/ui/Icons';
 import api from '../../api/axios';
@@ -8,10 +8,11 @@ const EMPTY_MED = { medicine:'', dosage:'', frequency:'', duration:'', instructi
 
 export default function NewPrescription() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [patients, setPatients] = useState([]);
   const [appointments, setAppointments] = useState([]);
-  const [patientId, setPatientId] = useState('');
-  const [appointmentId, setAppointmentId] = useState('');
+  const [patientId, setPatientId] = useState(() => location.state?.patientId || location.state?.patient?._id || '');
+  const [appointmentId, setAppointmentId] = useState(() => location.state?.appointmentId || '');
   const [diagnosis, setDiagnosis] = useState('');
   const [meds, setMeds] = useState([{ ...EMPTY_MED }]);
   const [notes, setNotes] = useState('');
@@ -27,6 +28,11 @@ export default function NewPrescription() {
       setPatients(pRes.data.patients || []);
       const confirmed = (aRes.data.appointments || []).filter(a => a.status === 'Confirmed' || a.status === 'Pending');
       setAppointments(confirmed);
+      // If we were passed a patientId or appointmentId via navigate state, keep them
+      if (location.state?.patientId || location.state?.patient) {
+        setPatientId(location.state.patientId || location.state.patient?._id);
+      }
+      if (location.state?.appointmentId) setAppointmentId(location.state.appointmentId);
     }).catch(console.error);
   }, []);
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import DoctorLayout from '../../components/layout/DoctorLayout';
 import { IcoCheck, IcoBan, IcoPhone } from '../../components/ui/Icons';
 import api from '../../api/axios';
@@ -6,6 +7,7 @@ import api from '../../api/axios';
 const STATUS_CLS = { Confirmed:'badge-completed', Pending:'badge-upcoming', Completed:'badge-completed', Cancelled:'badge-cancelled' };
 
 export default function DoctorAppointments() {
+  const navigate = useNavigate();
   const [appointments, setAppointments] = useState([]);
   const [tab, setTab] = useState('Pending');
   const [loading, setLoading] = useState(true);
@@ -21,6 +23,15 @@ export default function DoctorAppointments() {
     try {
       const { data } = await api.patch(`/appointments/${id}/status`, { status });
       setAppointments(prev => prev.map(a => a._id === id ? data.appointment : a));
+      // After confirming an appointment, navigate to patient detail to start consultation
+      if (status === 'Confirmed') {
+        try {
+          const patient = data.appointment.patient;
+          navigate('/doctor/patient-detail', { state: { patient, appointmentId: data.appointment._id } });
+        } catch (e) {
+          console.error('Navigation after confirm failed', e);
+        }
+      }
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to update');
     } finally {
