@@ -1,101 +1,121 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useAuth } from '../../context/AuthContext';
+import { connectSocket } from '../../utils/socket';
+import { downloadReportFile, openReportFile } from '../../utils/reportFiles';
 import DoctorLayout from '../../components/layout/DoctorLayout';
-import { IcoEye, IcoDownload, IcoSearch, IcoRefresh } from '../../components/ui/Icons';
-
-const REPORTS = [
-  { patient:'Ramesh Sharma', initials:'RS', type:'Blood Test',    date:'May 22, 2025' },
-  { patient:'Priya Mehta',   initials:'PM', type:'ECG',           date:'May 21, 2025' },
-  { patient:'Amit Verma',    initials:'AV', type:'X-Ray',         date:'May 20, 2025' },
-  { patient:'Sneha Iyer',    initials:'SI', type:'Blood Test',    date:'May 19, 2025' },
-  { patient:'Vikram Singh',  initials:'VS', type:'X-Ray',         date:'May 18, 2025' },
-  { patient:'Neha Kapoor',   initials:'NK', type:'Echocardiogram',date:'May 18, 2025' },
-];
+import { IcoEye, IcoDownload, IcoRefresh } from '../../components/ui/Icons';
+import api from '../../api/axios';
 
 export default function Reports() {
-  const [typeFilter, setTypeFilter] = useState('All Types');
-  const [patientFilter, setPatientFilter] = useState('All Patients');
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
+  const { token } = useAuth();
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filterTitle, setFilterTitle] = useState('All Reports');
+  const [filterPatient, setFilterPatient] = useState('All Patients');
   const [search, setSearch] = useState('');
+  const [selectedReport, setSelectedReport] = useState(null);
 
-  const filtered = REPORTS.filter(r => {
-    if (typeFilter !== 'All Types' && r.type !== typeFilter) return false;
-    if (patientFilter !== 'All Patients' && r.patient !== patientFilter) return false;
-    if (search && !r.patient.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
+  const fetchReports = async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.get('/reports/doctor');
+      setReports(data.reports || []);
+      if (data.reports?.length) setSelectedReport(data.reports[0]);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchReports();
+  }, []);
+
+  useEffect(() => {
+    if (!token) return;
+    const socket = connectSocket(token);
+    const handleUpdate = () => {
+      fetchReports();
+    };
+    socket.on('report_update', handleUpdate);
+    return () => {
+      socket.off('report_update', handleUpdate);
+    };
+  }, [token]);
+
+  const reportTitles = useMemo(() => {
+    const titles = new Set(reports.map(r => r.title || 'Report'));
+    return ['All Reports', ...titles];
+  }, [reports]);
+
+  const patientNames = useMemo(() => {
+    const names = new Set(reports.map(r => r.patient?.name || 'Unknown'));
+    return ['All Patients', ...names];
+  }, [reports]);
+
+  const filteredReports = useMemo(() => {
+    return reports.filter((r) => {
+      if (filterTitle !== 'All Reports' && (r.title || 'Report') !== filterTitle) return false;
+      if (filterPatient !== 'All Patients' && (r.patient?.name || 'Unknown') !== filterPatient) return false;
+      if (search && !((r.patient?.name || '').toLowerCase().includes(search.toLowerCase()) || (r.title || '').toLowerCase().includes(search.toLowerCase()))) return false;
+      return true;
+    });
+  }, [reports, filterTitle, filterPatient, search]);
 
   return (
     <DoctorLayout>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
         <div>
-          <div style={{ fontSize:20, fontWeight:700 }}>Reports</div>
           <div style={{ color:'#64748b', fontSize:13 }}>View and manage patient reports</div>
         </div>
-        <button style={{ background:'none', border:'none', cursor:'pointer', color:'#64748b' }}>
-          <IcoRefresh />
+        <button className="btn-outline btn-sm" onClick={fetchReports}>
+          <IcoRefresh /> Refresh
         </button>
       </div>
 
       <div className="card">
-        {/* Filters */}
         <div style={{ display:'flex', gap:10, marginBottom:18, flexWrap:'wrap', alignItems:'center' }}>
-          <select className="form-select" style={{ width:'auto', height:38 }}
-            value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
-            <option>All Types</option>
-            <option>Blood Test</option>
-            <option>ECG</option>
-            <option>X-Ray</option>
-            <option>Echocardiogram</option>
+          <select className="form-select" style={{ width:'auto', height:38 }} value={filterTitle} onChange={e => setFilterTitle(e.target.value)}>
+            {reportTitles.map(title => <option key={title}>{title}</option>)}
           </select>
-          <select className="form-select" style={{ width:'auto', height:38 }}
-            value={patientFilter} onChange={e => setPatientFilter(e.target.value)}>
-            <option>All Patients</option>
-            {REPORTS.map(r => <option key={r.patient}>{r.patient}</option>)}
+          <select className="form-select" style={{ width:'auto', height:38 }} value={filterPatient} onChange={e => setFilterPatient(e.target.value)}>
+            {patientNames.map(name => <option key={name}>{name}</option>)}
           </select>
-          <input type="date" value={from} onChange={e => setFrom(e.target.value)}
-            style={{ padding:'8px 10px', border:'1.5px solid #e2e8f0', borderRadius:8, fontSize:13, outline:'none', height:38 }}
-            placeholder="From Date"/>
-          <input type="date" value={to} onChange={e => setTo(e.target.value)}
-            style={{ padding:'8px 10px', border:'1.5px solid #e2e8f0', borderRadius:8, fontSize:13, outline:'none', height:38 }}
-            placeholder="To Date"/>
+          <input type="search" value={search} onChange={e => setSearch(e.target.value)}
+            style={{ padding:'8px 10px', border:'1.5px solid #e2e8f0', borderRadius:8, fontSize:13, outline:'none', height:38, minWidth:180 }}
+            placeholder="Search reports" />
         </div>
 
-        <table className="data-table">
-          <thead>
-            <tr><th>Report</th><th>Patient</th><th>Type</th><th>Date</th><th>Action</th></tr>
-          </thead>
-          <tbody>
-            {filtered.map((r, i) => (
-              <tr key={i}>
-                <td style={{ fontWeight:500 }}>{r.type} Report</td>
-                <td>
-                  <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                    <div className="doc-avatar">{r.initials}</div>
-                    <span>{r.patient}</span>
+        {loading ? (
+          <div style={{ padding:24, color:'#64748b' }}>Loading reports...</div>
+        ) : filteredReports.length === 0 ? (
+          <div style={{ padding:24, color:'#64748b' }}>No reports found.</div>
+        ) : (
+          <div style={{ display:'grid', gap:14 }}>
+            {filteredReports.map((report) => (
+              <div key={report._id} className="report-card" style={{ padding:18, border:'1px solid #e2e8f0', borderRadius:14, display:'grid', gridTemplateColumns:'1fr auto', gap:14 }}>
+                <div>
+                  <div style={{ fontWeight:700, marginBottom:6 }}>{report.title || 'Report'}</div>
+                  <div style={{ display:'flex', gap:12, flexWrap:'wrap', color:'#64748b', fontSize:13 }}>
+                    <span>{report.patient?.name || 'Patient'}</span>
+                    <span>{report.patient?.patientId || ''}</span>
+                    <span>{new Date(report.createdAt).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })}</span>
                   </div>
-                </td>
-                <td>
-                  <span style={{ background:'#f1f5f9', borderRadius:6, padding:'3px 10px', fontSize:12, color:'#475569', fontWeight:500 }}>
-                    {r.type}
-                  </span>
-                </td>
-                <td style={{ color:'#64748b', fontSize:13 }}>{r.date}</td>
-                <td>
-                  <div style={{ display:'flex', gap:6 }}>
-                    <button className="btn-outline btn-sm" style={{ display:'flex', alignItems:'center', gap:4 }}>
-                      <IcoEye /> View
-                    </button>
-                    <button className="btn-sm"
-                      style={{ background:'#f1f5f9', border:'1px solid #e2e8f0', borderRadius:6, cursor:'pointer', padding:'5px 10px', fontSize:12, display:'flex', alignItems:'center', gap:4, color:'#64748b' }}>
-                      <IcoDownload />
-                    </button>
-                  </div>
-                </td>
-              </tr>
+                  {report.notes && <div style={{ marginTop:10, color:'#475569' }}>{report.notes}</div>}
+                </div>
+                <div style={{ display:'flex', flexDirection:'column', gap:8, alignItems:'flex-end' }}>
+                  <button type="button" onClick={() => openReportFile(report._id).catch(() => alert('Unable to open this report.'))} className="btn-outline" style={{ display:'inline-flex', alignItems:'center', gap:6 }}>
+                    <IcoEye /> View
+                  </button>
+                  <button type="button" onClick={() => downloadReportFile(report._id).catch(() => alert('Unable to download this report.'))} className="btn-sm" style={{ display:'inline-flex', alignItems:'center', gap:6 }}>
+                    <IcoDownload /> Download
+                  </button>
+                </div>
+              </div>
             ))}
-          </tbody>
-        </table>
+          </div>
+        )}
       </div>
     </DoctorLayout>
   );

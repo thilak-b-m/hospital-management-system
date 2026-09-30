@@ -2,6 +2,7 @@ import { io } from "socket.io-client";
 
 let socket = null;
 let currentToken = null;
+const socketUrl = import.meta.env.VITE_SOCKET_URL || "http://localhost:5000";
 
 export function connectSocket(token) {
   // If same token and still connected, reuse
@@ -15,7 +16,7 @@ export function connectSocket(token) {
   }
 
   currentToken = token;
-  socket = io("http://localhost:5000", {
+  socket = io(socketUrl, {
     auth: { token },
     transports: ["websocket"],
     reconnection: true,

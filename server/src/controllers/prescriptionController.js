@@ -2,6 +2,9 @@ import Appointment from "../models/appointment.js";
 import Doctor from "../models/doctor.js";
 import Prescription from "../models/prescription.js";
 import User from "../models/user.js";
+import { canAccessPatient } from "../utils/patientAccess.js";
+import { emitToUser } from "../socketServer.js";
+import { notifyUser } from "../services/notificationService.js";
 
 const doctorPopulate = "name email phone role status";
 
@@ -60,12 +63,28 @@ export const createPrescription = async (req, res) => {
     let doctor;
     if (req.user.role === "doctor") {
       doctor = await getDoctorForUser(req.user.id);
+      if (doctorId && String(doctorId) !== String(doctor?._id)) {
+        return res.status(403).json({ success: false, message: "Doctors can only prescribe for themselves." });
+      }
+      if (!doctor) return res.status(404).json({ success: false, message: "Doctor profile not found" });
+      if (!await canAccessPatient(req.user, patient._id)) {
+        return res.status(403).json({ success: false, message: "You can only prescribe for your own patients." });
+      }
     } else if (doctorId) {
       doctor = await Doctor.findById(doctorId);
     }
 
     if (!doctor) {
       return res.status(400).json({ success: false, message: "Doctor is required" });
+    }
+
+    let appointment;
+    if (appointmentId) {
+      const appointmentFilter = { _id: appointmentId, patient: patient._id, doctor: doctor._id };
+      appointment = await Appointment.findOne(appointmentFilter);
+      if (!appointment) {
+        return res.status(403).json({ success: false, message: "Appointment does not belong to this patient and doctor." });
+      }
     }
 
     const prescription = await Prescription.create({
@@ -77,11 +96,27 @@ export const createPrescription = async (req, res) => {
       notes,
     });
 
-    if (appointmentId) {
-      await Appointment.findByIdAndUpdate(appointmentId, { status: "Completed" });
+    if (appointment) {
+      appointment.status = "Completed";
+      await appointment.save();
+      const populatedAppointment = await Appointment.findById(appointment._id)
+        .populate({ path: "doctor", populate: { path: "user", select: "_id" } });
+      if (populatedAppointment?.doctor?.user?._id) {
+        emitToUser(String(populatedAppointment.doctor.user._id), "doctor_schedule_update", {
+          type: "appointment_completed",
+          appointment: populatedAppointment,
+        });
+      }
     }
 
     const populated = await withPrescriptionRelations(Prescription.findById(prescription._id));
+    await notifyUser(patient._id, {
+      type: "system",
+      title: "New prescription available",
+      message: `A prescription for ${diagnosis} is available in your account.`,
+      link: "/patient/prescriptions",
+      metadata: { prescriptionId: String(prescription._id) },
+    });
     return res.status(201).json({
       success: true,
       message: "Prescription saved successfully",

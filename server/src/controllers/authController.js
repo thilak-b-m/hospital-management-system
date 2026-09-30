@@ -2,6 +2,8 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import User from "../models/user.js";
 import Doctor from "../models/doctor.js";
+import { isPasswordAcceptable } from "../utils/passwordPolicy.js";
+import { notifyAdmins } from "../services/notificationService.js";
 
 const createToken = (user) =>
   jwt.sign(
@@ -59,6 +61,9 @@ export const registerUser = async (req, res) => {
         message: "Please provide name, email, phone and password",
       });
     }
+    if (!isPasswordAcceptable(password)) {
+      return res.status(400).json({ success: false, message: "Password must be 8-72 characters." });
+    }
 
     const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
@@ -81,6 +86,14 @@ export const registerUser = async (req, res) => {
       gender,
       address,
       emergencyContact,
+    });
+
+    await notifyAdmins({
+      type: "system",
+      title: "New patient registered",
+      message: `${user.name} created a patient account.`,
+      link: "/admin/patients",
+      metadata: { patientId: String(user._id) },
     });
 
     const token = createToken(user);
@@ -177,8 +190,8 @@ export const changePassword = async (req, res) => {
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ success: false, message: "Please provide current and new password" });
     }
-    if (newPassword.length < 8) {
-      return res.status(400).json({ success: false, message: "New password must be at least 8 characters" });
+    if (!isPasswordAcceptable(newPassword)) {
+      return res.status(400).json({ success: false, message: "New password must be 8-72 characters." });
     }
 
     const user = await User.findById(req.user.id);
@@ -187,7 +200,7 @@ export const changePassword = async (req, res) => {
     const isValid = await bcrypt.compare(currentPassword, user.password);
     if (!isValid) return res.status(400).json({ success: false, message: "Current password is incorrect" });
 
-    user.password = await bcrypt.hash(newPassword, 10);
+    user.password = await bcrypt.hash(newPassword, 12);
     await user.save();
 
     return res.status(200).json({ success: true, message: "Password changed successfully" });

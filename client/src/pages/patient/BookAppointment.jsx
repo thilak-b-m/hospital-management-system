@@ -6,6 +6,36 @@ import api from '../../api/axios';
 
 const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
+function toSafeDate(dateInput) {
+  if (!dateInput) return null;
+  if (dateInput instanceof Date) {
+    return Number.isNaN(dateInput.getTime()) ? null : dateInput;
+  }
+  if (typeof dateInput !== 'string') return null;
+  const [y, m, d] = dateInput.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function parseDateLocal(dateStr) {
+  return toSafeDate(dateStr) || new Date();
+}
+
+function normalizeDateKey(dateInput) {
+  if (!dateInput) return null;
+  if (dateInput instanceof Date) {
+    return `${dateInput.getFullYear()}-${String(dateInput.getMonth() + 1).padStart(2, '0')}-${String(dateInput.getDate()).padStart(2, '0')}`;
+  }
+  if (typeof dateInput === 'string') {
+    const parts = dateInput.split('-');
+    if (parts.length !== 3) return null;
+    const [year, month, day] = parts.map(Number);
+    if ([year, month, day].some((value) => Number.isNaN(value))) return null;
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  }
+  return null;
+}
+
 function parseTime(str) {
   if (!str) return null;
   const [time, period] = str.trim().split(' ');
@@ -15,13 +45,27 @@ function parseTime(str) {
   return h * 60 + m;
 }
 
-function parseDateLocal(dateStr) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(y, m - 1, d);
+function isDateUnavailable(doctor, dateStr) {
+  if (!doctor || !doctor.unavailableDates || !dateStr) return false;
+  const requestedDate = normalizeDateKey(dateStr);
+  if (!requestedDate) return false;
+  return doctor.unavailableDates.some((entry) => {
+    if (!entry?.date) return false;
+    return normalizeDateKey(entry.date) === requestedDate;
+  });
+}
+
+function getUnavailableReason(doctor, dateStr) {
+  if (!doctor || !doctor.unavailableDates || !dateStr) return '';
+  const requestedDate = normalizeDateKey(dateStr);
+  if (!requestedDate) return '';
+  const entry = doctor.unavailableDates.find((item) => item?.date && normalizeDateKey(item.date) === requestedDate);
+  return entry?.reason || '';
 }
 
 function getAvailableTimesForDoctor(doctor, dateStr) {
   if (!doctor || !dateStr) return [];
+  if (isDateUnavailable(doctor, dateStr)) return [];
   const dayName = DAY_NAMES[parseDateLocal(dateStr).getDay()];
   const slot = doctor.availability?.find(a => a.day === dayName);
   if (!slot || !slot.available || !slot.startTime || !slot.endTime) return [];
@@ -79,10 +123,13 @@ export default function BookAppointment() {
 
   const isDayOff = (dateStr) => {
     if (!selectedDoc || !dateStr) return false;
+    if (isDateUnavailable(selectedDoc, dateStr)) return true;
     const dayName = DAY_NAMES[parseDateLocal(dateStr).getDay()];
     const slot = selectedDoc.availability?.find(a => a.day === dayName);
     return !slot || !slot.available;
   };
+
+  const unavailableReason = getUnavailableReason(selectedDoc, form.date);
 
   const handle = e => setForm(p => ({ ...p, [e.target.name]: e.target.value }));
 
@@ -155,7 +202,7 @@ export default function BookAppointment() {
                 min={new Date().toISOString().split('T')[0]} onChange={handle} required/>
               {form.date && dayOff && (
                 <div style={{ marginTop: 6, fontSize: 12, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <IcoBan /> Doctor is not available on {DAY_NAMES[parseDateLocal(form.date).getDay()]}s
+                  <IcoBan /> Doctor is not available on {DAY_NAMES[parseDateLocal(form.date).getDay()]}s{unavailableReason ? ` — ${unavailableReason}` : ''}
                 </div>
               )}
               {form.date && !dayOff && availableTimes.length > 0 && (

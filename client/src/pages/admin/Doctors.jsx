@@ -3,10 +3,9 @@ import AdminLayout from '../../components/layout/AdminLayout';
 import { IcoPlus, IcoSearch, IcoEdit, IcoTrash, IcoEye, IcoEyeOff } from '../../components/ui/Icons';
 import api from '../../api/axios';
 
-const DEPTS = ['Cardiology','Dermatology','Neurology','Orthopedics','Pediatrics','Gynecology','General Medicine','Radiology'];
-
 export default function AdminDoctors() {
   const [doctors, setDoctors] = useState([]);
+  const departments = [...new Set(doctors.map(doctor => doctor.department).filter(Boolean))].sort();
   const [search, setSearch] = useState('');
   const [deptF, setDeptF] = useState('All');
   const [statusF, setStatusF] = useState('All');
@@ -14,7 +13,7 @@ export default function AdminDoctors() {
   const [showModal, setShowModal] = useState(false);
   const [editDoc, setEditDoc] = useState(null);
   const [showPwd, setShowPwd] = useState(false);
-  const [form, setForm] = useState({ name:'', department:'Cardiology', experience:'', email:'', phone:'', password:'', status:'Active', qualification:'', consultationFee:500 });
+  const [form, setForm] = useState({ name:'', department:'', experience:'', email:'', phone:'', password:'', status:'Active', qualification:'', consultationFee:500 });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -24,18 +23,26 @@ export default function AdminDoctors() {
       .catch(console.error).finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    let active = true;
+    api.get('/admin/doctors').then(res => {
+      if (active) setDoctors(res.data.doctors || []);
+    }).catch(console.error).finally(() => {
+      if (active) setLoading(false);
+    });
+    return () => { active = false; };
+  }, []);
 
   const openAdd = () => {
     setEditDoc(null);
-    setForm({ name:'', department:'Cardiology', experience:'', email:'', phone:'', password:'', status:'Active', qualification:'', consultationFee:500 });
+    setForm({ name:'', department:'', experience:'', email:'', phone:'', password:'', status:'Active', qualification:'', consultationFee:500 });
     setError(''); setShowPwd(false); setShowModal(true);
   };
 
   const openEdit = (d) => {
     setEditDoc(d);
     setForm({
-      name: d.user?.name||'', department: d.department||'Cardiology',
+      name: d.user?.name||'', department: d.department||'',
       experience: d.experience||'', email: d.user?.email||'',
       phone: d.user?.phone||'', password:'', status: d.user?.status||'Active',
       qualification: d.qualification||'', consultationFee: d.consultationFee||500,
@@ -101,7 +108,7 @@ export default function AdminDoctors() {
           </div>
           <select className="form-select" style={{ width:'auto', height:38 }} value={deptF} onChange={e=>setDeptF(e.target.value)}>
             <option value="All">All Departments</option>
-            {DEPTS.map(d=><option key={d}>{d}</option>)}
+            {departments.map(d=><option key={d}>{d}</option>)}
           </select>
           <select className="form-select" style={{ width:'auto', height:38 }} value={statusF} onChange={e=>setStatusF(e.target.value)}>
             <option value="All">All Status</option><option>Active</option><option>Inactive</option>
@@ -172,9 +179,7 @@ export default function AdminDoctors() {
               <div className="grid-2">
                 <div className="form-group">
                   <label className="form-label">Department <span style={{ color:'#ef4444' }}>*</span></label>
-                  <select className="form-select" value={form.department} onChange={e=>setForm(p=>({...p,department:e.target.value}))}>
-                    {DEPTS.map(d=><option key={d}>{d}</option>)}
-                  </select>
+                  <input className="form-input" value={form.department} onChange={e=>setForm(p=>({...p,department:e.target.value}))} placeholder="Enter department" required />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Experience (years) <span style={{ color:'#ef4444' }}>*</span></label>

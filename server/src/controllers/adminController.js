@@ -1,9 +1,12 @@
 import bcrypt from "bcrypt";
+import mongoose from "mongoose";
 import Appointment from "../models/appointment.js";
 import Doctor from "../models/doctor.js";
 import Prescription from "../models/prescription.js";
 import Service from "../models/services.js";
 import User from "../models/user.js";
+import { isPasswordAcceptable } from "../utils/passwordPolicy.js";
+import { notifyUser } from "../services/notificationService.js";
 
 const nextPatientId = async () => {
   const count = await User.countDocuments({ role: "patient" });
@@ -19,11 +22,12 @@ export const getDashboardStats = async (req, res) => {
     const end = new Date(start);
     end.setDate(end.getDate() + 1);
 
-    const [patients, doctors, appointmentsToday, services, recentAppointments, departmentStats] =
+    const [patients, doctors, appointmentsToday, appointments, services, recentAppointments, departmentStats, departmentActivity] =
       await Promise.all([
         User.countDocuments({ role: "patient" }),
         Doctor.countDocuments(),
         Appointment.countDocuments({ appointmentDate: { $gte: start, $lt: end } }),
+        Appointment.countDocuments(),
         Service.countDocuments({ status: "Active" }),
         Appointment.find()
           .sort({ appointmentDate: -1, appointmentTime: -1 })
@@ -31,7 +35,24 @@ export const getDashboardStats = async (req, res) => {
           .populate("patient", "name patientId")
           .populate({ path: "doctor", populate: { path: "user", select: doctorPopulate } }),
         Doctor.aggregate([{ $group: { _id: "$department", doctors: { $sum: 1 } } }]),
+        Appointment.aggregate([
+          { $lookup: { from: Doctor.collection.name, localField: "doctor", foreignField: "_id", as: "doctor" } },
+          { $unwind: "$doctor" },
+          { $group: {
+            _id: "$doctor.department",
+            appointments: { $sum: 1 },
+            patients: { $addToSet: "$patient" },
+          } },
+          { $project: { appointments: 1, patients: { $size: "$patients" } } },
+        ]),
       ]);
+
+    const activityByDepartment = new Map(departmentActivity.map((department) => [department._id, department]));
+    const departments = departmentStats.map((department) => ({
+      ...department,
+      appointments: activityByDepartment.get(department._id)?.appointments || 0,
+      patients: activityByDepartment.get(department._id)?.patients || 0,
+    }));
 
     return res.status(200).json({
       success: true,
@@ -39,15 +60,94 @@ export const getDashboardStats = async (req, res) => {
         patients,
         doctors,
         appointmentsToday,
+        appointments,
         services,
       },
       recentAppointments,
-      departmentStats,
+      departmentStats: departments,
     });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ success: false, message: "Server error" });
   }
+};
+
+export const getAdminReportAnalytics = async (req, res) => {
+  try {
+    const rangeEnd = new Date();
+    rangeEnd.setUTCMonth(rangeEnd.getUTCMonth() + 1, 1);
+    rangeEnd.setUTCHours(0, 0, 0, 0);
+    const rangeStart = new Date(rangeEnd);
+    rangeStart.setUTCMonth(rangeStart.getUTCMonth() - 12);
+
+    const appointmentRange = { appointmentDate: { $gte: rangeStart, $lt: rangeEnd } };
+    const [totalPatients, totalAppointments, activeServices, revenueResult, monthlyAppointments, monthlyPatients, departmentPerformance] = await Promise.all([
+      User.countDocuments({ role: "patient" }),
+      Appointment.countDocuments(),
+      Service.countDocuments({ status: "Active" }),
+      Appointment.aggregate([
+        { $match: { status: "Completed" } },
+        { $lookup: { from: Doctor.collection.name, localField: "doctor", foreignField: "_id", as: "doctor" } },
+        { $unwind: "$doctor" },
+        { $group: { _id: null, total: { $sum: { $ifNull: ["$doctor.consultationFee", 0] } } } },
+      ]),
+      Appointment.aggregate([
+        { $match: appointmentRange },
+        { $group: { _id: { $dateToString: { format: "%Y-%m", date: "$appointmentDate", timezone: "UTC" } }, count: { $sum: 1 } } },
+        { $sort: { _id: 1 } },
+      ]),
+      User.aggregate([
+        { $match: { role: "patient", createdAt: { $gte: rangeStart, $lt: rangeEnd } } },
+        { $group: { _id: { $dateToString: { format: "%Y-%m", date: "$createdAt", timezone: "UTC" } }, count: { $sum: 1 } } },
+        { $sort: { _id: 1 } },
+      ]),
+      Appointment.aggregate([
+        { $match: appointmentRange },
+        { $lookup: { from: Doctor.collection.name, localField: "doctor", foreignField: "_id", as: "doctor" } },
+        { $unwind: "$doctor" },
+        { $group: {
+          _id: "$doctor.department",
+          appointments: { $sum: 1 },
+          completed: { $sum: { $cond: [{ $eq: ["$status", "Completed"] }, 1, 0] } },
+          patients: { $addToSet: "$patient" },
+          revenue: { $sum: { $cond: [{ $eq: ["$status", "Completed"] }, { $ifNull: ["$doctor.consultationFee", 0] }, 0] } },
+        } },
+        { $project: { appointments: 1, completed: 1, revenue: 1, patients: { $size: "$patients" } } },
+        { $sort: { appointments: -1 } },
+      ]),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      range: { from: rangeStart, to: rangeEnd },
+      kpis: {
+        totalPatients,
+        totalAppointments,
+        totalRevenue: revenueResult[0]?.total || 0,
+        activeServices,
+      },
+      monthlyAppointments,
+      monthlyPatients,
+      departmentPerformance,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Unable to load report analytics" });
+  }
+};
+
+export const getAdminRuntimeSettings = async (req, res) => {
+  const states = ["disconnected", "connected", "connecting", "disconnecting"];
+  return res.status(200).json({
+    success: true,
+    appName: "CityCare Hospital",
+    environment: process.env.NODE_ENV || "development",
+    databaseStatus: states[mongoose.connection.readyState] || "unknown",
+    databaseReady: mongoose.connection.readyState === 1,
+    port: Number(process.env.PORT || 5000),
+    clientOrigins: process.env.CLIENT_ORIGINS || "http://localhost:5173,http://127.0.0.1:5173",
+    serverTime: new Date().toISOString(),
+  });
 };
 
 export const getAllUsers = async (req, res) => {
@@ -136,13 +236,16 @@ export const addDoctor = async (req, res) => {
         message: "Please provide name, email, phone, password, department and experience",
       });
     }
+    if (!isPasswordAcceptable(password)) {
+      return res.status(400).json({ success: false, message: "Password must be 8-72 characters." });
+    }
 
     const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
       return res.status(400).json({ success: false, message: "Email already exists" });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 12);
     const user = await User.create({
       name,
       email,
@@ -288,13 +391,16 @@ export const addPatient = async (req, res) => {
         message: "Please provide name, email, phone and password",
       });
     }
+    if (!isPasswordAcceptable(password)) {
+      return res.status(400).json({ success: false, message: "Password must be 8-72 characters." });
+    }
 
     const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
       return res.status(400).json({ success: false, message: "Email already exists" });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 12);
     const patient = await User.create({
       name,
       email,
@@ -474,6 +580,30 @@ export const updateAppointmentStatus = async (req, res) => {
 
     if (!appointment) {
       return res.status(404).json({ success: false, message: "Appointment not found" });
+    }
+
+    if (appointment.doctor?.user?._id) {
+      emitToUser(String(appointment.doctor.user._id), "doctor_schedule_update", {
+        type: "appointment_status_updated",
+        appointment,
+      });
+    }
+
+    await notifyUser(appointment.patient?._id, {
+      type: "appointment",
+      title: `Appointment ${status.toLowerCase()}`,
+      message: `Your appointment status was changed to ${status.toLowerCase()}.`,
+      link: "/patient/appointments",
+      metadata: { appointmentId: String(appointment._id), status },
+    });
+    if (appointment.doctor?.user?._id) {
+      await notifyUser(appointment.doctor.user._id, {
+        type: "appointment",
+        title: `Appointment ${status.toLowerCase()}`,
+        message: `${appointment.patient?.name || "A patient"}'s appointment status was changed by an admin.`,
+        link: "/doctor/appointments",
+        metadata: { appointmentId: String(appointment._id), status },
+      });
     }
 
     return res.status(200).json({

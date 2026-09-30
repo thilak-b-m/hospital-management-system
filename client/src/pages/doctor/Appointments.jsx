@@ -50,7 +50,7 @@ export default function DoctorAppointments() {
   return (
     <DoctorLayout>
       <div className="card">
-        <div style={{ display:'flex', gap:4, background:'#f1f5f9', borderRadius:10, padding:4, marginBottom:20, width:'fit-content' }}>
+        <div className="appointment-tabs" style={{ display:'flex', gap:4, background:'#f1f5f9', borderRadius:10, padding:4, marginBottom:20, width:'fit-content' }}>
           {['Pending','Confirmed','Completed','Cancelled'].map(t => (
             <button key={t} onClick={() => setTab(t)}
               style={{
@@ -72,7 +72,7 @@ export default function DoctorAppointments() {
             {filtered.map((a) => {
               const initials = a.patient?.name?.split(' ').slice(0,2).map(w=>w[0]).join('')||'PT';
               return (
-                <div key={a._id} style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 16px', border:'1px solid #e2e8f0', borderRadius:12 }}>
+                <div key={a._id} className="doctor-appointment-row" style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 16px', border:'1px solid #e2e8f0', borderRadius:12 }}>
                   <div style={{ fontSize:12, fontWeight:700, color:'var(--primary)', width:70, flexShrink:0 }}>{a.appointmentTime}</div>
                   <div className="doc-avatar" style={{ width:44, height:44 }}>{initials}</div>
                   <div style={{ flex:1 }}>

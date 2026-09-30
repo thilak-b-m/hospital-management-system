@@ -1,6 +1,8 @@
 import MedicalHistory from "../models/medicalHistory.js";
 import User from "../models/user.js";
 import Doctor from "../models/doctor.js";
+import Appointment from "../models/appointment.js";
+import { canAccessPatient } from "../utils/patientAccess.js";
 
 const getOrCreate = async (patientId) => {
   let history = await MedicalHistory.findOne({ patient: patientId });
@@ -11,8 +13,11 @@ const getOrCreate = async (patientId) => {
 export const getMedicalHistory = async (req, res) => {
   try {
     const { patientId } = req.params;
-    const patient = await User.findById(patientId);
+    const patient = await User.findOne({ _id: patientId, role: "patient" });
     if (!patient) return res.status(404).json({ success: false, message: "Patient not found" });
+    if (!await canAccessPatient(req.user, patientId)) {
+      return res.status(403).json({ success: false, message: "You do not have access to this patient's records." });
+    }
     const history = await MedicalHistory.findOne({ patient: patientId }).lean();
     return res.status(200).json({ success: true, history: history || { patient: patientId, entries: [], healthSummary: {} } });
   } catch (error) {
@@ -25,6 +30,9 @@ export const updateHealthSummary = async (req, res) => {
   try {
     const { patientId } = req.params;
     const { bloodGroup, height, weight, allergies, chronicConditions } = req.body;
+    if (!await canAccessPatient(req.user, patientId)) {
+      return res.status(403).json({ success: false, message: "You do not have access to this patient's records." });
+    }
 
     let doctorRef = null;
     if (req.user.role === "doctor") {
@@ -56,6 +64,21 @@ export const addHistoryEntry = async (req, res) => {
     const { title, type = "Diagnosis", notes = "", medications = [], appointmentId, vitals } = req.body;
 
     if (!title) return res.status(400).json({ success: false, message: "Title is required" });
+    if (!await canAccessPatient(req.user, patientId)) {
+      return res.status(403).json({ success: false, message: "You do not have access to this patient's records." });
+    }
+
+    if (appointmentId) {
+      const appointmentFilter = { _id: appointmentId, patient: patientId };
+      if (req.user.role === "doctor") {
+        const doctor = await Doctor.findOne({ user: req.user.id }).select("_id");
+        if (!doctor) return res.status(404).json({ success: false, message: "Doctor profile not found" });
+        appointmentFilter.doctor = doctor._id;
+      }
+      if (!await Appointment.exists(appointmentFilter)) {
+        return res.status(403).json({ success: false, message: "Appointment does not belong to this patient and care team." });
+      }
+    }
 
     const history = await getOrCreate(patientId);
 

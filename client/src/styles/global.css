@@ -63,6 +63,17 @@ body {
 .nav-item:hover { background: var(--sidebar-hover); color: white; }
 .nav-item.active { background: var(--sidebar-active); color: white; }
 .nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+.message-nav-link { position: relative; }
+.message-unread-dot {
+  position: absolute;
+  top: 8px;
+  left: 31px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+  border: 1px solid var(--sidebar-bg);
+}
 
 /* Topbar */
 .topbar {
@@ -402,6 +413,7 @@ body {
 }
 .admin-sidebar .nav-item:hover  { background: rgba(255,255,255,0.07); }
 .admin-sidebar .nav-item.active { background: #4f46e5; }
+.admin-sidebar .message-unread-dot { border-color: #1a1f3c; }
 .admin-sidebar .nav-sub { padding-left: 44px; font-size: 13px; }
 
 /* Admin topbar search */
@@ -433,6 +445,31 @@ body {
   font-weight: 700;
   border: 2px solid white;
 }
+.notification-filters { display:flex; gap:4px; width:fit-content; margin-bottom:16px; padding:4px; border-radius:8px; background:#f1f5f9; }
+.notification-filters button { border:0; border-radius:6px; background:transparent; color:#64748b; padding:7px 14px; cursor:pointer; font-size:13px; }
+.notification-filters button.active { background:white; color:var(--primary); box-shadow:0 1px 4px rgba(0,0,0,0.08); }
+.notification-list { display:flex; flex-direction:column; gap:8px; }
+.notification-item { display:flex; width:100%; align-items:flex-start; gap:12px; padding:14px 16px; text-align:left; border:1px solid #e2e8f0; border-radius:8px; background:white; cursor:pointer; }
+.notification-item.unread { border-left:3px solid var(--primary); }
+.notification-icon { display:flex; flex:0 0 36px; width:36px; height:36px; align-items:center; justify-content:center; border-radius:8px; background:#eff6ff; color:var(--primary); }
+.notification-copy { display:flex; flex:1; min-width:0; flex-direction:column; gap:4px; }
+.notification-title { color:#1e293b; font-size:14px; font-weight:600; }
+.notification-message { color:#64748b; font-size:13px; line-height:1.5; }
+.notification-copy time { color:#94a3b8; font-size:11px; }
+.notification-status-dot { flex:0 0 8px; width:8px; height:8px; margin-top:5px; border-radius:50%; background:#ef4444; }
+.notification-empty { padding:32px; text-align:center; color:#94a3b8; }
+.notification-error { margin-bottom:12px; padding:10px 14px; border:1px solid #fecaca; border-radius:8px; background:#fee2e2; color:#b91c1c; }
+.runtime-list { display:flex; flex-direction:column; gap:12px; }
+.runtime-list > div { display:flex; justify-content:space-between; align-items:center; gap:16px; padding-bottom:10px; border-bottom:1px solid #f1f5f9; }
+.runtime-list > div:last-child { padding-bottom:0; border-bottom:0; }
+.runtime-list dt { color:#64748b; font-size:13px; }
+.runtime-list dd { margin:0; color:#1e293b; font-size:13px; font-weight:600; text-align:right; }
+.analytics-bars { display:flex; flex-direction:column; gap:10px; }
+.analytics-bar-row { display:grid; grid-template-columns:68px minmax(0,1fr) 36px; align-items:center; gap:10px; color:#64748b; font-size:12px; }
+.analytics-bar-row strong { color:#334155; text-align:right; }
+.analytics-bar-track { height:8px; overflow:hidden; border-radius:4px; background:#f1f5f9; }
+.analytics-bar-track > span { display:block; height:100%; border-radius:inherit; background:#2563eb; }
+.analytics-bar-track.patients > span { background:#059669; }
 
 /* Stat growth */
 .growth-up   { color: #16a34a; font-size: 12px; font-weight: 500; display:flex; align-items:center; gap:3px; margin-top:4px; }
@@ -520,3 +557,70 @@ body {
 }
 .page-header-title  { font-size: 20px; font-weight: 700; }
 .page-header-sub    { font-size: 13px; color: #64748b; margin-top: 2px; }
+
+@media (max-width: 760px) {
+  .layout { flex-direction: column; }
+  .sidebar {
+    position: relative;
+    width: 100% !important;
+    min-height: 0;
+    height: auto;
+  }
+  .sidebar-logo { padding: 14px 16px; }
+  .admin-sidebar .sidebar-logo {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+  .admin-sidebar .panel-label { margin: 0 0 0 auto; }
+  .sidebar-nav {
+    display: flex;
+    flex: 0 0 auto;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 6px 10px;
+    scrollbar-width: thin;
+  }
+  .admin-sidebar .sidebar-nav { overflow-y: hidden !important; }
+  .sidebar-nav > div { flex: 0 0 auto; }
+  .sidebar-nav .nav-item {
+    width: auto !important;
+    padding: 10px 12px;
+    white-space: nowrap;
+  }
+  .main-content { width: 100%; min-width: 0; margin-left: 0; }
+  .topbar { min-height: 60px; height: auto; gap: 8px; padding-top: 10px; padding-bottom: 10px; }
+  .page-body { padding: 22px 18px 32px; }
+  .grid-2 { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .grid-3, .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .card, .stat-card { border-radius: 8px; padding: 18px; }
+  .card:has(.data-table) { overflow-x: auto; }
+  .data-table { min-width: 640px; }
+  .appointment-filters, .appointment-tabs { max-width: 100%; overflow-x: auto; scrollbar-width: thin; }
+  .appointment-filters button, .appointment-tabs button { flex: 0 0 auto; }
+  .doctor-appointment-row { flex-wrap: wrap; }
+  .patient-overview-header { flex-direction: column; }
+  .patient-overview-heading { flex-direction: column; gap: 12px; width: 100%; }
+  .patient-overview-actions { flex-wrap: wrap; }
+  .patient-detail-tabs { max-width: 100%; overflow-x: auto; scrollbar-width: thin; }
+  .patient-detail-tabs button { flex: 0 0 auto; padding-left: 12px !important; padding-right: 12px !important; }
+  .grid-4 .stat-card { min-width: 0 !important; }
+  .admin-search { width: min(260px, 42vw); }
+  .user-info { display: none; }
+  .auth-page { flex-direction: column; min-height: 100vh; }
+  .auth-left { flex: none; min-height: 168px; padding: 22px 18px; }
+  .auth-left > div:first-child { font-size: 22px !important; }
+  .auth-left > div:nth-child(2) { margin-top: 4px !important; }
+  .auth-left .hospital-art, .auth-left > div:last-child { display: none; }
+  .auth-right { flex: 1; padding: 24px 20px; }
+}
+
+@media (max-width: 480px) {
+  .page-body { padding: 18px 14px 28px; }
+  .grid-3 { grid-template-columns: minmax(0, 1fr); }
+  .stat-card { gap: 10px; padding: 14px; }
+  .stat-icon { width: 40px; height: 40px; flex-shrink: 0; }
+  .admin-search { width: min(180px, 38vw); }
+  .page-header { flex-direction: column; gap: 12px; }
+  .auth-left { min-height: 148px; padding: 18px 16px; }
+}

@@ -1,11 +1,10 @@
-import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   IcoDashboard, IcoUsers, IcoUser, IcoCalendar, IcoReport,
-  IcoSettings, IcoLogout, IcoBell, IcoSearch,
-  IcoChevronDown, IcoMessage
+  IcoSettings, IcoLogout, IcoBell, IcoSearch, IcoMessage
 } from '../ui/Icons';
 import { useAuth } from '../../context/AuthContext';
+import { useNotifications } from '../../hooks/useNotifications';
 
 const IcoShield = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -33,7 +32,7 @@ const IcoCreditCard = () => (
 
 const NAV = [
   { to: '/admin/dashboard',     label: 'Dashboard',     Icon: IcoDashboard  },
-  { to: '/admin/users',         label: 'Users',         Icon: IcoUsers, subs: ['All Users','Doctors','Patients'] },
+  { to: '/admin/users',         label: 'Users',         Icon: IcoUsers      },
   { to: '/admin/doctors',       label: 'Doctors',       Icon: IcoUser       },
   { to: '/admin/patients',      label: 'Patients',      Icon: IcoStaff      },
   { to: '/admin/appointments',  label: 'Appointments',  Icon: IcoCalendar   },
@@ -43,13 +42,13 @@ const NAV = [
   { to: '/admin/reports',       label: 'Reports',       Icon: IcoReport     },
   { to: '/admin/messages',      label: 'Messages',      Icon: IcoMessage    },
   { to: '/admin/settings',      label: 'Settings',      Icon: IcoSettings   },
-  { to: '/admin/notifications', label: 'Notifications', Icon: IcoBell, badge: 5 },
+  { to: '/admin/notifications', label: 'Notifications', Icon: IcoBell       },
 ];
 
 export default function AdminLayout({ children }) {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const [userOpen, setUserOpen] = useState(false);
+  const { unreadCount } = useNotifications();
 
   const initials = user?.name
     ? user.name.split(' ').slice(0,2).map(w => w[0]).join('').toUpperCase()
@@ -60,11 +59,7 @@ export default function AdminLayout({ children }) {
       <aside className="sidebar admin-sidebar" style={{ width:220 }}>
         <div className="sidebar-logo">
           <div className="logo-row">
-            <svg viewBox="0 0 32 32" width="26" height="26" fill="none">
-              <circle cx="16" cy="16" r="16" fill="#818cf8"/>
-              <rect x="14" y="7" width="4" height="18" fill="white" rx="1"/>
-              <rect x="7" y="14" width="18" height="4" fill="white" rx="1"/>
-            </svg>
+            <img src="/shield-plus.svg" alt="" width="26" height="26" />
             CityCare
             <span style={{ fontSize:10, opacity:0.6 }}>HOSPITAL</span>
           </div>
@@ -72,44 +67,11 @@ export default function AdminLayout({ children }) {
         </div>
 
         <nav className="sidebar-nav" style={{ overflowY:'auto' }}>
-          {NAV.map(({ to, label, Icon, subs, badge }) => {
-            const isUsers = to === '/admin/users';
-            return (
-              <div key={to}>
-                {isUsers ? (
-                  <div className="nav-item"
-                    onClick={() => { setUserOpen(o => !o); navigate(to); }}
-                    style={{ justifyContent:'space-between' }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-                      <Icon />{label}
-                    </div>
-                    <span style={{ opacity:0.6, transform: userOpen ? 'rotate(180deg)' : 'none', transition:'transform 0.2s', display:'flex' }}>
-                      <IcoChevronDown />
-                    </span>
-                  </div>
-                ) : (
-                  <NavLink to={to} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
-                    style={{ justifyContent:'space-between' }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-                      <Icon />{label}
-                    </div>
-                    {badge && (
-                      <span style={{ background:'#ef4444', color:'white', borderRadius:10, padding:'1px 7px', fontSize:11, fontWeight:700 }}>
-                        {badge}
-                      </span>
-                    )}
-                  </NavLink>
-                )}
-                {isUsers && userOpen && subs && subs.map(s => (
-                  <div key={s} className="nav-item"
-                    style={{ paddingLeft:44, fontSize:13, color:'rgba(255,255,255,0.55)', cursor:'pointer' }}
-                    onClick={() => navigate('/admin/users')}>
-                    {s}
-                  </div>
-                ))}
-              </div>
-            );
-          })}
+          {NAV.map(({ to, label, Icon }) => (
+            <NavLink key={to} to={to} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
+              <Icon />{label}
+            </NavLink>
+          ))}
           <button onClick={() => { logout(); navigate('/login'); }}
             className="nav-item"
             style={{ width:'100%', background:'none', border:'none', textAlign:'left' }}>
@@ -136,17 +98,18 @@ export default function AdminLayout({ children }) {
           </div>
           <div style={{ display:'flex', alignItems:'center', gap:12 }}>
             <div className="notif-wrap">
-              <button className="notif-btn"><IcoBell /></button>
-              <span className="notif-dot">5</span>
+              <button className="notif-btn" onClick={() => navigate('/admin/notifications')} aria-label={`Notifications, ${unreadCount} unread`}>
+                <IcoBell />
+              </button>
+              {unreadCount > 0 && <span className="notif-dot">{unreadCount > 9 ? '9+' : unreadCount}</span>}
             </div>
-            <button className="notif-btn"><IcoMessage /></button>
+            <button className="notif-btn" onClick={() => navigate('/admin/messages')} aria-label="Messages"><IcoMessage /></button>
             <div className="user-badge">
               <div className="user-avatar" style={{ background:'#4f46e5' }}>{initials}</div>
               <div className="user-info">
                 <div className="name">{user?.name || 'Admin'}</div>
                 <div className="role">Super Admin</div>
               </div>
-              <IcoChevronDown />
             </div>
           </div>
         </header>

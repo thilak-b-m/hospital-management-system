@@ -1,7 +1,12 @@
 import Appointment from "../models/appointment.js";
 import Doctor from "../models/doctor.js";
+import User from "../models/user.js";
+import { emitToUser } from "../socketServer.js";
+import { canAccessPatient } from "../utils/patientAccess.js";
+import { notifyAdmins, notifyUser } from "../services/notificationService.js";
 
 const doctorPopulate = "name email phone role status";
+const WEEK_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 const withAppointmentRelations = (query) =>
   query
@@ -26,32 +31,106 @@ export const createAppointment = async (req, res) => {
       return res.status(400).json({ success: false, message: "Please provide appointment date and appointment time" });
     }
 
-    let doctor = null;
-    if (doctorId) {
-      doctor = await Doctor.findById(doctorId).populate("user", doctorPopulate);
+    if (!['patient', 'doctor', 'admin'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: "You cannot create appointments." });
     }
-    // If the request is from a doctor and no doctorId provided, use the doctor's profile for the current user
-    if (!doctor && req.user.role === "doctor") {
-      const d = await getDoctorForUser(req.user.id);
-      if (d) doctor = await Doctor.findById(d._id).populate("user", doctorPopulate);
+
+    let doctor = null;
+    if (req.user.role === "doctor") {
+      const ownDoctor = await getDoctorForUser(req.user.id);
+      if (!ownDoctor) return res.status(404).json({ success: false, message: "Doctor profile not found" });
+      if (doctorId && String(doctorId) !== String(ownDoctor._id)) {
+        return res.status(403).json({ success: false, message: "Doctors can only create appointments for themselves." });
+      }
+      doctor = await Doctor.findById(ownDoctor._id).populate("user", doctorPopulate);
+    } else if (doctorId) {
+      doctor = await Doctor.findById(doctorId).populate("user", doctorPopulate);
     }
 
     if (!doctor || doctor.user?.status !== "Active") {
       return res.status(404).json({ success: false, message: "Doctor not found" });
     }
 
-    let patient;
-    if (req.user.role === "doctor") {
-      if (!patientId) return res.status(400).json({ success: false, message: "patientId is required" });
-      patient = patientId;
-    } else if (req.user.role === "admin" && patientId) {
-      patient = patientId;
-    } else {
-      patient = req.user.id;
+    const appointmentDateObj = new Date(`${appointmentDate}T00:00:00Z`);
+    if (Number.isNaN(appointmentDateObj.getTime())) {
+      return res.status(400).json({ success: false, message: "Invalid appointment date" });
+    }
+    const appointmentDateKey = appointmentDateObj.toISOString().split("T")[0];
+
+    const unavailableMatch = (doctor.unavailableDates || []).some((entry) => {
+      if (!entry?.date) return false;
+      const entryDate = new Date(entry.date);
+      const entryKey = new Date(Date.UTC(entryDate.getUTCFullYear(), entryDate.getUTCMonth(), entryDate.getUTCDate())).toISOString().split("T")[0];
+      return entryKey === appointmentDateKey;
+    });
+
+    if (unavailableMatch) {
+      return res.status(400).json({ success: false, message: "Doctor is unavailable on the selected day" });
     }
 
-    const appointment = await Appointment.create({ patient, doctor: doctor._id, appointmentDate, appointmentTime, symptoms, status: "Pending" });
+    const dayName = WEEK_DAYS[appointmentDateObj.getUTCDay()];
+    const dayAvailability = doctor.availability?.find((slot) => slot.day === dayName);
+    if (!dayAvailability || !dayAvailability.available) {
+      return res.status(400).json({ success: false, message: "Doctor is unavailable on the selected day" });
+    }
+
+    let patient;
+    if (req.user.role === "patient") {
+      patient = req.user.id;
+    } else {
+      if (!patientId) return res.status(400).json({ success: false, message: "patientId is required" });
+      patient = await User.findOne({ _id: patientId, role: "patient", status: "Active" }).select("_id");
+      if (!patient) return res.status(404).json({ success: false, message: "Active patient not found" });
+      patient = patient._id;
+      if (req.user.role === "doctor" && !await canAccessPatient(req.user, patient)) {
+        return res.status(403).json({ success: false, message: "You can only book follow-up appointments for your own patients." });
+      }
+    }
+
+    const existingSlot = await Appointment.exists({
+      doctor: doctor._id,
+      appointmentDate: appointmentDateObj,
+      appointmentTime,
+      status: { $ne: "Cancelled" },
+    });
+    if (existingSlot) {
+      return res.status(409).json({ success: false, message: "This appointment slot is already booked." });
+    }
+
+    const appointment = await Appointment.create({ patient, doctor: doctor._id, appointmentDate: appointmentDateObj, appointmentTime, symptoms, status: "Pending" });
     const populated = await withAppointmentRelations(Appointment.findById(appointment._id));
+
+    if (doctor.user?._id) {
+      emitToUser(String(doctor.user._id), "doctor_schedule_update", {
+        type: "appointment_created",
+        appointment: populated,
+      });
+    }
+
+    await notifyUser(patient, {
+      type: "appointment",
+      title: "Appointment request submitted",
+      message: `Your appointment request for ${appointmentDateKey} at ${appointmentTime} is pending.`,
+      link: "/patient/appointments",
+      metadata: { appointmentId: String(appointment._id) },
+    });
+    if (doctor.user?._id && String(doctor.user._id) !== String(req.user.id)) {
+      await notifyUser(doctor.user._id, {
+        type: "appointment",
+        title: "New appointment request",
+        message: `${populated.patient?.name || "A patient"} requested ${appointmentDateKey} at ${appointmentTime}.`,
+        link: "/doctor/appointments",
+        metadata: { appointmentId: String(appointment._id) },
+      });
+    }
+    await notifyAdmins({
+      type: "appointment",
+      title: "New appointment request",
+      message: `${populated.patient?.name || "A patient"} requested an appointment with ${doctor.user?.name || "a doctor"}.`,
+      link: "/admin/appointments",
+      metadata: { appointmentId: String(appointment._id) },
+    }, req.user.role === "admin" ? [req.user.id] : []);
+
     return res.status(201).json({ success: true, message: "Appointment booked successfully", appointment: populated });
   } catch (error) {
     console.error(error);
@@ -75,6 +154,9 @@ export const getAppointments = async (req, res) => {
 export const getPatientAppointments = async (req, res) => {
   try {
     const { patientId } = req.params;
+    if (!await canAccessPatient(req.user, patientId)) {
+      return res.status(403).json({ success: false, message: "You do not have access to this patient's appointments." });
+    }
     const appointments = await withAppointmentRelations(
       Appointment.find({ patient: patientId }).sort({ appointmentDate: -1 })
     );
@@ -112,6 +194,41 @@ export const updateAppointmentStatus = async (req, res) => {
     await appointment.save();
 
     const populated = await withAppointmentRelations(Appointment.findById(appointment._id));
+
+    const appointmentDoctor = await Doctor.findById(appointment.doctor).populate("user", "_id");
+    if (appointmentDoctor?.user?._id) {
+      emitToUser(String(appointmentDoctor.user._id), "doctor_schedule_update", {
+        type: "appointment_status_updated",
+        appointment: populated,
+      });
+    }
+
+    const changedAt = new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+    await notifyUser(populated.patient?._id, {
+      type: "appointment",
+      title: `Appointment ${status.toLowerCase()}`,
+      message: `Your appointment on ${changedAt} is now ${status.toLowerCase()}.`,
+      link: "/patient/appointments",
+      metadata: { appointmentId: String(appointment._id), status },
+    });
+    const doctorUserId = populated.doctor?.user?._id;
+    if (doctorUserId && String(doctorUserId) !== String(req.user.id)) {
+      await notifyUser(doctorUserId, {
+        type: "appointment",
+        title: `Appointment ${status.toLowerCase()}`,
+        message: `${populated.patient?.name || "A patient"}'s appointment is now ${status.toLowerCase()}.`,
+        link: "/doctor/appointments",
+        metadata: { appointmentId: String(appointment._id), status },
+      });
+    }
+    await notifyAdmins({
+      type: "appointment",
+      title: `Appointment ${status.toLowerCase()}`,
+      message: `${populated.patient?.name || "A patient"}'s appointment status changed to ${status.toLowerCase()}.`,
+      link: "/admin/appointments",
+      metadata: { appointmentId: String(appointment._id), status },
+    }, req.user.role === "admin" ? [req.user.id] : []);
+
     return res.status(200).json({ success: true, message: "Appointment updated successfully", appointment: populated });
   } catch (error) {
     console.error(error);

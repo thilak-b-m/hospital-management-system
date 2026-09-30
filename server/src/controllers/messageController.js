@@ -1,6 +1,8 @@
 import Message from "../models/message.js";
 import User from "../models/user.js";
 import Doctor from "../models/doctor.js";
+import Appointment from "../models/appointment.js";
+import { canMessageContact } from "../utils/messagingAccess.js";
 
 // GET /api/messages/contacts — list of people this user has chatted with or can chat with
 export const getContacts = async (req, res) => {
@@ -10,32 +12,36 @@ export const getContacts = async (req, res) => {
     let contacts = [];
 
     if (role === "patient") {
-      // Show all active doctors
-      const doctors = await Doctor.find()
-        .populate("user", "name email role status")
-        .sort({ department: 1 });
-      contacts = doctors
-        .filter((d) => d.user?.status === "Active")
-        .map((d) => ({
-          _id: d.user._id,
-          name: d.user.name,
+      const appointments = await Appointment.find({ patient: id, status: { $ne: "Cancelled" } })
+        .populate({ path: "doctor", populate: { path: "user", select: "name email role status" } })
+        .sort({ appointmentDate: -1 });
+      const seen = new Set();
+      contacts = appointments
+        .filter((appointment) => {
+          const doctorUser = appointment.doctor?.user;
+          if (!doctorUser || doctorUser.status !== "Active" || seen.has(String(doctorUser._id))) return false;
+          seen.add(String(doctorUser._id));
+          return true;
+        })
+        .map((appointment) => ({
+          _id: appointment.doctor.user._id,
+          name: appointment.doctor.user.name,
           role: "doctor",
-          sub: d.department,
-          doctorId: d._id,
+          sub: appointment.doctor.department,
+          doctorId: appointment.doctor._id,
         }));
     } else if (role === "doctor") {
       // Show all patients who have appointments with this doctor
       const doctor = await Doctor.findOne({ user: id });
       if (!doctor) return res.status(404).json({ success: false, message: "Doctor not found" });
 
-      const { default: Appointment } = await import("../models/appointment.js");
       const appts = await Appointment.find({ doctor: doctor._id })
         .populate("patient", "name email role status patientId")
         .sort({ appointmentDate: -1 });
 
       const seen = new Set();
       contacts = appts
-        .filter((a) => a.patient && !seen.has(String(a.patient._id)) && seen.add(String(a.patient._id)))
+        .filter((a) => a.status !== "Cancelled" && a.patient?.status === "Active" && !seen.has(String(a.patient._id)) && seen.add(String(a.patient._id)))
         .map((a) => ({
           _id: a.patient._id,
           name: a.patient.name,
@@ -62,6 +68,9 @@ export const getMessages = async (req, res) => {
   try {
     const { id } = req.user;
     const { contactId } = req.params;
+    if (!await canMessageContact(req.user, contactId)) {
+      return res.status(403).json({ success: false, message: "You do not have access to this conversation." });
+    }
     const roomId = [id, contactId].sort().join("_");
 
     const messages = await Message.find({ roomId }).sort({ createdAt: 1 }).limit(100).lean();

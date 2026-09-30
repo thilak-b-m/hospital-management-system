@@ -85,7 +85,7 @@ export default function Register() {
               <label className="form-label">Password</label>
               <div style={{ position:'relative' }}>
                 <input className="form-input" type={showPwd ? 'text' : 'password'} name="password"
-                  placeholder="Min. 8 characters" value={form.password} onChange={handle} required style={{ paddingRight:40 }}/>
+                  placeholder="Min. 8 characters" value={form.password} onChange={handle} required minLength={8} maxLength={72} style={{ paddingRight:40 }}/>
                 <button type="button" onClick={() => setShowPwd(p => !p)}
                   style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'#94a3b8' }}>
                   {showPwd ? <IcoEyeOff /> : <IcoEye />}

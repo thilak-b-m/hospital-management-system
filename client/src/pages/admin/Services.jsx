@@ -3,14 +3,13 @@ import AdminLayout from '../../components/layout/AdminLayout';
 import { IcoPlus, IcoEdit, IcoTrash } from '../../components/ui/Icons';
 import api from '../../api/axios';
 
-const DEPTS = ['General Medicine','Cardiology','Neurology','Orthopedics','Dermatology','Pediatrics','Gynecology','Radiology','Pathology'];
-
 export default function AdminServices() {
   const [services, setServices] = useState([]);
+  const departments = [...new Set(services.map(service => service.department).filter(Boolean))].sort();
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
   const [editSvc, setEditSvc] = useState(null);
-  const [form, setForm] = useState({ name:'', department:'General Medicine', fee:'', duration:'', status:'Active' });
+  const [form, setForm] = useState({ name:'', department:'', fee:'', duration:'', status:'Active' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -20,11 +19,19 @@ export default function AdminServices() {
       .catch(console.error).finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    let active = true;
+    api.get('/admin/services').then(res => {
+      if (active) setServices(res.data.services || []);
+    }).catch(console.error).finally(() => {
+      if (active) setLoading(false);
+    });
+    return () => { active = false; };
+  }, []);
 
   const openAdd = () => {
     setEditSvc(null);
-    setForm({ name:'', department:'General Medicine', fee:'', duration:'', status:'Active' });
+    setForm({ name:'', department:'', fee:'', duration:'', status:'Active' });
     setError(''); setModal(true);
   };
 
@@ -109,9 +116,8 @@ export default function AdminServices() {
                 <input className="form-input" value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))} required/>
               </div>
               <div className="form-group"><label className="form-label">Department *</label>
-                <select className="form-select" value={form.department} onChange={e=>setForm(p=>({...p,department:e.target.value}))}>
-                  {DEPTS.map(d=><option key={d}>{d}</option>)}
-                </select>
+                <input className="form-input" list="service-departments" value={form.department} onChange={e=>setForm(p=>({...p,department:e.target.value}))} required />
+                <datalist id="service-departments">{departments.map(department=><option key={department} value={department}/>)}</datalist>
               </div>
               <div className="grid-2">
                 <div className="form-group"><label className="form-label">Fee (₹) *</label>

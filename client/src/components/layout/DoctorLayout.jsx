@@ -2,9 +2,10 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   IcoDashboard, IcoCalendar, IcoUsers, IcoCalPlus,
   IcoPrescription, IcoReport, IcoMessage, IcoUser,
-  IcoSettings, IcoLogout, IcoBell, IcoChevronRight
+  IcoSettings, IcoLogout, IcoBell
 } from '../ui/Icons';
 import { useAuth } from '../../context/AuthContext';
+import { useNotifications } from '../../hooks/useNotifications';
 
 const NAV = [
   { to: '/doctor/dashboard',     label: 'Dashboard',     Icon: IcoDashboard    },
@@ -28,6 +29,7 @@ const TITLES = {
   '/doctor/messages':         'Messages',
   '/doctor/profile':          'Profile',
   '/doctor/settings':         'Settings',
+  '/doctor/notifications':    'Notifications',
   '/doctor/patient-detail':   'Patient Detail',
   '/doctor/new-prescription': 'New Prescription',
 };
@@ -37,6 +39,7 @@ export default function DoctorLayout({ children }) {
   const { pathname } = useLocation();
   const { user, logout } = useAuth();
   const title = TITLES[pathname] || 'Dashboard';
+  const { unreadCount } = useNotifications();
   const initials = user?.name
     ? user.name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
     : 'DR';
@@ -45,11 +48,7 @@ export default function DoctorLayout({ children }) {
     <div className="layout">
       <aside className="sidebar">
         <div className="sidebar-logo">
-          <svg viewBox="0 0 32 32" width="28" height="28" fill="none">
-            <circle cx="16" cy="16" r="16" fill="#60a5fa"/>
-            <rect x="14" y="7" width="4" height="18" fill="white" rx="1"/>
-            <rect x="7" y="14" width="18" height="4" fill="white" rx="1"/>
-          </svg>
+          <img src="/shield-plus.svg" alt="" width="28" height="28" />
           CityCare
         </div>
         <nav className="sidebar-nav">
@@ -70,17 +69,12 @@ export default function DoctorLayout({ children }) {
       <div className="main-content">
         <header className="topbar">
           <div className="topbar-left">
-            <div>
-              <div className="topbar-title">{title}</div>
-              {title !== 'Dashboard' && (
-                <div className="topbar-breadcrumb" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  Dashboard <IcoChevronRight /> {title}
-                </div>
-              )}
-            </div>
+            <div className="topbar-title">{title}</div>
           </div>
           <div className="topbar-right">
-            <button className="notif-btn"><IcoBell /></button>
+            <button className="notif-btn notif-wrap" onClick={() => navigate('/doctor/notifications')} aria-label={`Notifications, ${unreadCount} unread`}>
+              <IcoBell />{unreadCount > 0 && <span className="notif-dot">{unreadCount > 9 ? '9+' : unreadCount}</span>}
+            </button>
             <div className="user-badge">
               <div className="user-avatar" style={{ background: '#0369a1' }}>{initials}</div>
               <div className="user-info">

@@ -11,6 +11,7 @@ import MyAppointments    from './pages/patient/MyAppointments';
 import DoctorDetails     from './pages/patient/DoctorDetails';
 import MyPrescriptions   from './pages/patient/MyPrescriptions';
 import MyProfile         from './pages/patient/MyProfile';
+import PatientReports     from './pages/patient/Reports';
 import ChangePassword     from './pages/patient/ChangePassword';
 import PatientMessages    from './pages/patient/Messages';
 import PatientServices    from './pages/patient/Services';
@@ -39,8 +40,8 @@ import AdminServices      from './pages/admin/Services';
 import AdminPayments      from './pages/admin/Payments';
 import AdminReports       from './pages/admin/Reports';
 import AdminSettings      from './pages/admin/Settings';
-import AdminNotifications from './pages/admin/Notifications';
 import AdminMessages      from './pages/admin/Messages';
+import Notifications      from './pages/Notifications';
 
 export default function App() {
   return (
@@ -56,9 +57,11 @@ export default function App() {
       <Route path="/patient/doctor-details"   element={<DoctorDetails />} />
       <Route path="/patient/prescriptions"    element={<MyPrescriptions />} />
       <Route path="/patient/profile"          element={<MyProfile />} />
+      <Route path="/patient/reports"          element={<PatientReports />} />
       <Route path="/patient/change-password"  element={<ChangePassword />} />
       <Route path="/patient/messages"         element={<PatientMessages />} />
       <Route path="/patient/services"         element={<PatientServices />} />
+      <Route path="/patient/notifications"    element={<Notifications />} />
 
       {/* ── Doctor ── */}
       <Route path="/doctor/dashboard"        element={<DoctorDashboard />} />
@@ -72,6 +75,7 @@ export default function App() {
       <Route path="/doctor/messages"         element={<Messages />} />
       <Route path="/doctor/profile"          element={<DoctorProfile />} />
       <Route path="/doctor/settings"         element={<DoctorSettings />} />
+      <Route path="/doctor/notifications"    element={<Notifications />} />
 
       {/* ── Admin ── */}
       <Route path="/admin/dashboard"     element={<AdminDashboard />} />
@@ -84,7 +88,7 @@ export default function App() {
       <Route path="/admin/payments"      element={<AdminPayments />} />
       <Route path="/admin/reports"       element={<AdminReports />} />
       <Route path="/admin/settings"      element={<AdminSettings />} />
-      <Route path="/admin/notifications" element={<AdminNotifications />} />
+      <Route path="/admin/notifications" element={<Notifications />} />
       <Route path="/admin/messages"      element={<AdminMessages />} />
     </Routes>
   );

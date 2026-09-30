@@ -1,5 +1,13 @@
 import api from '../api/axios';
 
+const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, (character) => ({
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
+}[character]));
+
 const wrap = (title, body) => `
   <html>
   <head>
@@ -33,15 +41,27 @@ export async function printPatientSummary(patientId) {
     const prescriptions = rxRes.data.prescriptions || [];
     const reports = rRes.data.reports || [];
 
+    const consultationSummaries = (history.entries || [])
+      .filter((e) => e.type === 'Consultation' || /consultation summary/i.test(e.title || ''))
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
+    const latestConsultationSummary = consultationSummaries[0];
+
     const body = `
       <h1>Patient Summary</h1>
+      ${latestConsultationSummary ? `
+      <div class="section">
+        <h2>Latest Consultation Summary</h2>
+        <div style="padding:16px;border:1px solid #ddd;border-radius:10px;line-height:1.6;white-space:pre-wrap;">${escapeHtml(latestConsultationSummary.notes || '').replace(/\r?\n/g,'<br/>')}</div>
+        <div style="margin-top:10px;color:#555;font-size:12px;">Saved on ${new Date(latestConsultationSummary.date).toLocaleString()}</div>
+      </div>
+      ` : ''}
       <div class="section">
         <h2>Medical History</h2>
         ${history.entries.length === 0 ? '<div>No history</div>' : `
           <table>
             <thead><tr><th>Date</th><th>Title</th><th>Notes</th></tr></thead>
             <tbody>
-              ${history.entries.map(e => `<tr><td>${new Date(e.date).toLocaleString()}</td><td>${e.title}</td><td>${(e.notes||'').replace(/\n/g,'<br/>')}</td></tr>`).join('')}
+              ${history.entries.map(e => `<tr><td>${new Date(e.date).toLocaleString()}</td><td>${escapeHtml(e.title)}</td><td>${escapeHtml(e.notes || '').replace(/\r?\n/g,'<br/>')}</td></tr>`).join('')}
             </tbody>
           </table>`}
       </div>
@@ -51,7 +71,7 @@ export async function printPatientSummary(patientId) {
           <table>
             <thead><tr><th>Date</th><th>Diagnosis</th><th>Medications</th></tr></thead>
             <tbody>
-              ${prescriptions.map(p => `<tr><td>${new Date(p.createdAt).toLocaleString()}</td><td>${p.diagnosis}</td><td>${(p.medications||[]).map(m=>m.medicine+' ('+m.dosage+')').join('<br/>')}</td></tr>`).join('')}
+              ${prescriptions.map(p => `<tr><td>${new Date(p.createdAt).toLocaleString()}</td><td>${escapeHtml(p.diagnosis)}</td><td>${(p.medications||[]).map(m=>`${escapeHtml(m.medicine)} (${escapeHtml(m.dosage)})`).join('<br/>')}</td></tr>`).join('')}
             </tbody>
           </table>`}
       </div>
@@ -61,7 +81,7 @@ export async function printPatientSummary(patientId) {
           <table>
             <thead><tr><th>Date</th><th>Title</th><th>File</th></tr></thead>
             <tbody>
-              ${reports.map(r=>`<tr><td>${new Date(r.createdAt).toLocaleString()}</td><td>${r.title||'Report'}</td><td><a href="${r.fileUrl}" target="_blank">Open</a></td></tr>`).join('')}
+              ${reports.map(r=>`<tr><td>${new Date(r.createdAt).toLocaleString()}</td><td>${escapeHtml(r.title || 'Report')}</td><td>Open in the authenticated Reports page</td></tr>`).join('')}
             </tbody>
           </table>`}
     `;

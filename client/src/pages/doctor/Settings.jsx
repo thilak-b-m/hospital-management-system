@@ -30,7 +30,6 @@ export default function Settings() {
 
   return (
     <DoctorLayout>
-      <div style={{ fontWeight:700, fontSize:20, marginBottom:4 }}>Settings</div>
       <div style={{ color:'#64748b', fontSize:13, marginBottom:20 }}>Manage your account settings</div>
 
       {saved && (

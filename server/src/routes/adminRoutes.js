@@ -11,6 +11,8 @@ import {
   getAllDoctors,
   getAllUsers,
   getAppointments,
+  getAdminReportAnalytics,
+  getAdminRuntimeSettings,
   getDashboardStats,
   getDoctorById,
   getDoctorsByDepartment,
@@ -29,6 +31,8 @@ const router = express.Router();
 router.use(protect, authorize("admin"));
 
 router.get("/dashboard", getDashboardStats);
+router.get("/reports", getAdminReportAnalytics);
+router.get("/settings/runtime", getAdminRuntimeSettings);
 
 router.get("/users", getAllUsers);
 router.get("/users/role/:role", getUserByRole);

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const BASE = 'http://localhost:5000';
+const BASE = process.env.API_BASE || 'http://localhost:5000';
 
 const doctorCreds = { email: 'doctor@citycare.com', password: 'Doctor@1234' };
 

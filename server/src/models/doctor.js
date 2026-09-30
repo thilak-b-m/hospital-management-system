@@ -61,6 +61,19 @@ const doctorSchema = new mongoose.Schema(
         { day: "Sunday", startTime: "", endTime: "", available: false },
       ],
     },
+    unavailableDates: {
+      type: [
+        {
+          date: Date,
+          reason: {
+            type: String,
+            trim: true,
+            default: "",
+          },
+        },
+      ],
+      default: [],
+    },
   },
   {
     timestamps: true,

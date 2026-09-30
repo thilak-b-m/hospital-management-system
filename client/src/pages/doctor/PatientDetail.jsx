@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import DoctorLayout from '../../components/layout/DoctorLayout';
 import ConsultationOverview from '../../components/doctor/ConsultationOverview';
 import { printPatientSummary } from '../../utils/print';
+import { openReportFile } from '../../utils/reportFiles';
 import { IcoEdit, IcoPhone, IcoMail, IcoMapPin, IcoActivity, IcoHeart, IcoThermometer, IcoWind } from '../../components/ui/Icons';
 
 const TABS = ['Overview','Medical History','Prescriptions','Reports','Appointments'];
@@ -37,6 +38,8 @@ export default function PatientDetail() {
   const [reportTitle, setReportTitle] = useState('');
   const [reportNotes, setReportNotes] = useState('');
   const [vitalsState, setVitalsState] = useState({ bloodPressure:'', heartRate:'', temperature:'', respiratoryRate:'' });
+  const [consultationSummary, setConsultationSummary] = useState('');
+  const [consultationStatus, setConsultationStatus] = useState({ message:'', type:'' });
   const [editingSummary, setEditingSummary] = useState(false);
   const [summaryState, setSummaryState] = useState({ bloodGroup:'', height:'', weight:'', allergies:'', chronicConditions:'' });
   const [showAddAppointment, setShowAddAppointment] = useState(false);
@@ -90,6 +93,28 @@ export default function PatientDetail() {
     } catch (err) { console.error(err); }
   };
 
+  const handleSaveConsultationSummary = async () => {
+    if (!consultationSummary.trim()) {
+      setConsultationStatus({ message: 'Please enter a summary note before saving.', type: 'error' });
+      return;
+    }
+    setConsultationStatus({ message: '', type: '' });
+    try {
+      await api.post(`/medical-history/${patient._id}/entries`, {
+        title: 'Consultation Summary',
+        type: 'Consultation',
+        notes: consultationSummary,
+        appointmentId,
+      });
+      await refreshAll();
+      setConsultationSummary('');
+      setConsultationStatus({ message: 'Consultation summary saved.', type: 'success' });
+    } catch (err) {
+      console.error(err);
+      setConsultationStatus({ message: err.response?.data?.message || 'Failed to save consultation summary.', type: 'error' });
+    }
+  };
+
   return (
     <DoctorLayout>
       {/* Back + actions */}
@@ -106,7 +131,7 @@ export default function PatientDetail() {
 
       {/* Patient header */}
       <div className="card" style={{ marginBottom:20 }}>
-        <div style={{ display:'flex', gap:20, alignItems:'flex-start' }}>
+        <div className="patient-overview-header" style={{ display:'flex', gap:20, alignItems:'flex-start' }}>
           <div style={{ width:90, height:90, borderRadius:'50%', background:'#e2e8f0', flexShrink:0, overflow:'hidden' }}>
             <svg viewBox="0 0 90 90" width="90" height="90">
               <circle cx="45" cy="45" r="45" fill="#cbd5e1"/>
@@ -116,7 +141,7 @@ export default function PatientDetail() {
             </svg>
           </div>
           <div style={{ flex:1 }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+            <div className="patient-overview-heading" style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
               <div>
                 <div style={{ fontWeight:700, fontSize:22 }}>{patient?.name || 'Patient Name'}</div>
                 <div style={{ color:'#64748b', fontSize:13, marginTop:2 }}>{patient?.patientId || ''}</div>
@@ -135,7 +160,7 @@ export default function PatientDetail() {
                   </span>
                 </div>
               </div>
-                <div style={{ display:'flex', gap:8 }}>
+                <div className="patient-overview-actions" style={{ display:'flex', gap:8 }}>
                   <button className="btn-outline btn-sm" onClick={() => printPatientSummary(patient?._id)}>Print Summary</button>
                   <button className="btn-primary btn-sm" onClick={() => {}}>
                     <IcoEdit /> Edit Patient
@@ -146,7 +171,7 @@ export default function PatientDetail() {
         </div>
 
         {/* Tabs */}
-        <div style={{ display:'flex', gap:0, marginTop:20, borderBottom:'2px solid #e2e8f0' }}>
+        <div className="patient-detail-tabs" style={{ display:'flex', gap:0, marginTop:20, borderBottom:'2px solid #e2e8f0' }}>
           {TABS.map(t => (
             <button key={t} onClick={() => setTab(t)}
               style={{
@@ -236,6 +261,31 @@ export default function PatientDetail() {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Consultation Summary */}
+          <div className="card">
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+              <div style={{ fontWeight:600 }}>Consultation Summary</div>
+              <div style={{ fontSize:13, color:'#64748b' }}>Write a note to store in medical history</div>
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+              <textarea
+                value={consultationSummary}
+                onChange={(e) => setConsultationSummary(e.target.value)}
+                placeholder="Add a summary note here to help create the patient report..."
+                style={{ minHeight:140, padding:14, border:'1px solid #e2e8f0', borderRadius:12, fontSize:14, lineHeight:1.6 }}
+              />
+              {consultationStatus.message && (
+                <div style={{ padding:'10px 14px', borderRadius:10, color: consultationStatus.type === 'error' ? '#b91c1c' : '#166534', background: consultationStatus.type === 'error' ? '#fee2e2' : '#dcfce7', border: consultationStatus.type === 'error' ? '1px solid #fecaca' : '1px solid #bbf7d0' }}>
+                  {consultationStatus.message}
+                </div>
+              )}
+              <div style={{ display:'flex', justifyContent:'flex-end', gap:8 }}>
+                <button className="btn-outline" type="button" onClick={() => setConsultationSummary('')}>Clear</button>
+                <button className="btn-primary" type="button" onClick={handleSaveConsultationSummary}>Save Summary</button>
+              </div>
+            </div>
           </div>
 
           {/* Latest Diagnosis */}
@@ -461,8 +511,9 @@ export default function PatientDetail() {
                 <div style={{ fontWeight:600 }}>Reports</div>
                 {user?.role === 'doctor' && (
                   <div style={{ display:'flex', gap:8 }}>
-                    <input type="text" placeholder="Title" value={reportTitle} onChange={e => setReportTitle(e.target.value)} style={{ padding:8, border:'1px solid #e2e8f0', borderRadius:6 }} />
+                    <input type="text" placeholder="Title" value={reportTitle} onChange={e => setReportTitle(e.target.value)} style={{ padding:8, border:'1px solid #e2e8f0', borderRadius:6, minWidth:180 }} />
                     <input type="file" onChange={e => setReportFile(e.target.files[0])} />
+                    <input type="text" placeholder="Notes (optional)" value={reportNotes} onChange={e => setReportNotes(e.target.value)} style={{ padding:8, border:'1px solid #e2e8f0', borderRadius:6, minWidth:180 }} />
                     <button className="btn-primary" onClick={async () => {
                       if (!reportFile) return alert('Please select a file');
                       const fd = new FormData();
@@ -471,7 +522,7 @@ export default function PatientDetail() {
                       fd.append('notes', reportNotes || '');
                       if (appointmentId) fd.append('appointmentId', appointmentId);
                       try {
-                        await api.post(`/reports/${patient._id}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+                        await api.post(`/reports/${patient._id}`, fd);
                         const res = await api.get(`/reports/${patient._id}`);
                         setReports(res.data.reports || []);
                         setReportFile(null); setReportTitle(''); setReportNotes('');
@@ -496,7 +547,7 @@ export default function PatientDetail() {
                         {r.notes && <div style={{ marginTop:6 }}>{r.notes}</div>}
                       </div>
                       <div>
-                        <a href={r.fileUrl} target="_blank" rel="noreferrer" className="btn-outline">Open</a>
+                        <button type="button" onClick={() => openReportFile(r._id).catch(() => alert('Unable to open this report.'))} className="btn-outline">Open</button>
                       </div>
                     </div>
                   ))}

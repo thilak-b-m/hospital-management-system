@@ -32,7 +32,7 @@ export default function MyAppointments() {
   return (
     <PatientLayout>
       <div className="card">
-        <div style={{ display:'flex', gap:8, marginBottom:20 }}>
+        <div className="appointment-filters" style={{ display:'flex', gap:8, marginBottom:20 }}>
           {['All','Pending','Confirmed','Completed','Cancelled'].map(f => (
             <button key={f} onClick={() => setFilter(f)}
               style={{

@@ -12,13 +12,15 @@ export default function AdminAppointments() {
   const [search, setSearch] = useState('');
   const [updating, setUpdating] = useState(null);
 
-  const load = () => {
-    setLoading(true);
-    api.get('/admin/appointments').then(res => setAppointments(res.data.appointments||[]))
-      .catch(console.error).finally(() => setLoading(false));
-  };
-
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    let active = true;
+    api.get('/admin/appointments').then(res => {
+      if (active) setAppointments(res.data.appointments || []);
+    }).catch(console.error).finally(() => {
+      if (active) setLoading(false);
+    });
+    return () => { active = false; };
+  }, []);
 
   const updateStatus = async (id, status) => {
     setUpdating(id);

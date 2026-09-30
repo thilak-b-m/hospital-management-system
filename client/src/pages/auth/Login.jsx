@@ -54,11 +54,7 @@ export default function Login() {
     <div className="auth-page">
       <div className="auth-left">
         <div style={{ display:'flex', alignItems:'center', gap:10, fontSize:26, fontWeight:700 }}>
-          <svg viewBox="0 0 32 32" width="36" height="36" fill="none">
-            <circle cx="16" cy="16" r="16" fill="#60a5fa"/>
-            <rect x="14" y="7" width="4" height="18" fill="white" rx="1"/>
-            <rect x="7" y="14" width="18" height="4" fill="white" rx="1"/>
-          </svg>
+          <img src="/shield-plus.svg" alt="" width="36" height="36" />
           CityCare Hospital
         </div>
         <div style={{ fontSize:14, opacity:0.7, textAlign:'center', marginTop:8 }}>

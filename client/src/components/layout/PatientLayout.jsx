@@ -1,16 +1,18 @@
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
-  IcoCross, IcoDashboard, IcoCalPlus, IcoCalendar,
+  IcoDashboard, IcoCalPlus, IcoCalendar,
   IcoPrescription, IcoUser, IcoMessage, IcoStethoscope,
-  IcoLogout, IcoBell, IcoChevronRight
+  IcoReport, IcoLogout, IcoBell, IcoChevronRight
 } from '../ui/Icons';
 import { useAuth } from '../../context/AuthContext';
+import { useNotifications } from '../../hooks/useNotifications';
 
 const NAV = [
   { to: '/patient/dashboard',        label: 'Dashboard',        Icon: IcoDashboard    },
   { to: '/patient/book-appointment', label: 'Book Appointment', Icon: IcoCalPlus      },
   { to: '/patient/appointments',     label: 'My Appointments',  Icon: IcoCalendar     },
   { to: '/patient/prescriptions',    label: 'My Prescriptions', Icon: IcoPrescription },
+  { to: '/patient/reports',          label: 'Reports',          Icon: IcoReport       },
   { to: '/patient/messages',         label: 'Messages',         Icon: IcoMessage      },
   { to: '/patient/services',         label: 'Services',         Icon: IcoStethoscope  },
   { to: '/patient/profile',          label: 'My Profile',       Icon: IcoUser         },
@@ -23,9 +25,11 @@ const TITLES = {
   '/patient/prescriptions':    'My Prescriptions',
   '/patient/messages':         'Messages',
   '/patient/services':         'Services',
+  '/patient/reports':          'Reports',
   '/patient/profile':          'My Profile',
   '/patient/change-password':  'My Profile',
   '/patient/doctor-details':   'Doctor Details',
+  '/patient/notifications':    'Notifications',
 };
 
 export default function PatientLayout({ children }) {
@@ -34,6 +38,7 @@ export default function PatientLayout({ children }) {
   const { user, logout } = useAuth();
   const title = TITLES[pathname] || 'Dashboard';
   const parent = title !== 'Dashboard' ? 'Dashboard' : null;
+  const { unreadCount } = useNotifications();
 
   const initials = user?.name
     ? user.name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
@@ -44,7 +49,7 @@ export default function PatientLayout({ children }) {
       <aside className="sidebar">
         <div className="sidebar-logo">
           <img src="/shield-plus.svg" alt="Logo" />
-          HMS
+          CityCare
         </div>
         <nav className="sidebar-nav">
           {NAV.map(({ to, label, Icon }) => (
@@ -73,7 +78,9 @@ export default function PatientLayout({ children }) {
             </div>
           </div>
           <div className="topbar-right">
-            <button className="notif-btn"><IcoBell /></button>
+            <button className="notif-btn notif-wrap" onClick={() => navigate('/patient/notifications')} aria-label={`Notifications, ${unreadCount} unread`}>
+              <IcoBell />{unreadCount > 0 && <span className="notif-dot">{unreadCount > 9 ? '9+' : unreadCount}</span>}
+            </button>
             <div className="user-badge">
               <div className="user-avatar">{initials}</div>
               <div className="user-info">

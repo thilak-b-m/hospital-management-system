@@ -6,33 +6,13 @@ import api from '../../api/axios';
 
 const STATUS_CLS = { Completed:'badge-completed', Confirmed:'badge-scheduled', Pending:'badge-upcoming', Cancelled:'badge-cancelled' };
 
-function LineChart({ data }) {
-  if (!data || data.length === 0) return null;
-  const W=440, H=130, PAD=10;
-  const vals = data.map(d => d.count||0);
-  const max = Math.max(...vals, 1);
-  const toX = i => PAD + (i/(vals.length-1||1))*(W-2*PAD);
-  const toY = v => H - PAD - (v/max)*(H-2*PAD);
-  const path = vals.map((v,i) => `${i===0?'M':'L'}${toX(i)},${toY(v)}`).join(' ');
-  return (
-    <svg viewBox={`0 0 ${W} ${H+24}`} width="100%" style={{ overflow:'visible' }}>
-      {[0.25,0.5,0.75,1].map(f=>(
-        <line key={f} x1={PAD} y1={toY(max*f)} x2={W-PAD} y2={toY(max*f)} stroke="#f1f5f9" strokeWidth="1"/>
-      ))}
-      <path d={path} fill="none" stroke="#4f46e5" strokeWidth="2.5" strokeLinejoin="round"/>
-      {vals.map((v,i)=><circle key={i} cx={toX(i)} cy={toY(v)} r="3.5" fill="#4f46e5"/>)}
-    </svg>
-  );
-}
-
 function Donut({ data }) {
   const total = data.reduce((s,d) => s+d.val, 0)||1;
   const colors = ['#4f46e5','#06b6d4','#f59e0b','#ef4444'];
   const R=52, CX=70, CY=70;
-  let cum=0;
   const arcs = data.map((d,i)=>{
-    const start=cum, end=cum+(d.val/total)*360;
-    cum=end;
+    const start = data.slice(0, i).reduce((sum, item) => sum + item.val, 0) / total * 360;
+    const end = start + (d.val/total)*360;
     const a1=((start-90)*Math.PI)/180, a2=((end-90)*Math.PI)/180;
     const x1=CX+R*Math.cos(a1), y1=CY+R*Math.sin(a1);
     const x2=CX+R*Math.cos(a2), y2=CY+R*Math.sin(a2);
@@ -65,18 +45,23 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     api.get('/admin/dashboard').then(res => setData(res.data))
-      .catch(console.error).finally(() => setLoading(false));
-  }, []);
+      .catch(err => {
+        console.error(err);
+        setLoadError('Dashboard data is unavailable. Check that the API and database are running.');
+      }).finally(() => setLoading(false));
+  }, [retry]);
 
-  const stats = data ? [
-    { label:'Total Patients',     value: data.stats.patients,          Icon:IcoUsers,    color:'#dbeafe', ic:'#1d4ed8' },
-    { label:'Total Doctors',      value: data.stats.doctors,           Icon:IcoUser,     color:'#dcfce7', ic:'#15803d' },
-    { label:'Appointments Today', value: data.stats.appointmentsToday, Icon:IcoCalendar, color:'#fce7f3', ic:'#be185d' },
-    { label:'Active Services',    value: data.stats.services,          Icon:IcoReport,   color:'#d1fae5', ic:'#065f46' },
-  ] : [];
+  const stats = [
+    { label:'Total Patients',     value: data?.stats?.patients ?? '—',          Icon:IcoUsers,    color:'#dbeafe', ic:'#1d4ed8' },
+    { label:'Total Doctors',      value: data?.stats?.doctors ?? '—',           Icon:IcoUser,     color:'#dcfce7', ic:'#15803d' },
+    { label:'Appointments Today', value: data?.stats?.appointmentsToday ?? '—', Icon:IcoCalendar, color:'#fce7f3', ic:'#be185d' },
+    { label:'Active Services',    value: data?.stats?.services ?? '—',          Icon:IcoReport,   color:'#d1fae5', ic:'#065f46' },
+  ];
 
   const donutData = data ? (() => {
     const appts = data.recentAppointments || [];
@@ -97,6 +82,13 @@ export default function AdminDashboard() {
           <span>{new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})}</span>
         </div>
       </div>
+
+      {loadError && (
+        <div role="alert" style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, flexWrap:'wrap', background:'#fff7ed', color:'#9a3412', border:'1px solid #fed7aa', borderRadius:8, padding:'12px 16px', marginBottom:20, fontSize:13 }}>
+          <span>{loadError}</span>
+          <button className="btn-outline btn-sm" onClick={() => { setLoading(true); setRetry(value => value + 1); }}>Retry</button>
+        </div>
+      )}
 
       <div className="grid-4" style={{ marginBottom:24 }}>
         {loading ? (

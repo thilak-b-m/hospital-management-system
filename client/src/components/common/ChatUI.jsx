@@ -13,6 +13,7 @@ export default function ChatUI({ Layout }) {
   const [search, setSearch] = useState('');
   const [loadingContacts, setLoadingContacts] = useState(true);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
+  const [chatError, setChatError] = useState('');
   const bottomRef = useRef(null);
   const socketRef = useRef(null);
   const activeIdRef = useRef(null);
@@ -55,6 +56,11 @@ export default function ChatUI({ Layout }) {
     };
 
     sock.on('receive_message', handleMessage);
+    const handleChatError = (error) => {
+      setChatError(error.message || 'This conversation is no longer available.');
+      setMessages(prev => prev.filter(message => !message.isOptimistic));
+    };
+    sock.on('chat_error', handleChatError);
 
     // Re-join room if socket reconnects mid-session
     sock.on('connect', () => {
@@ -65,6 +71,7 @@ export default function ChatUI({ Layout }) {
 
     return () => {
       sock.off('receive_message', handleMessage);
+      sock.off('chat_error', handleChatError);
       sock.off('connect');
     };
   }, [token]);
@@ -81,6 +88,7 @@ export default function ChatUI({ Layout }) {
   useEffect(() => {
     if (!activeId) return;
 
+    setChatError('');
     setLoadingMsgs(true);
     setMessages([]);
 
@@ -89,7 +97,7 @@ export default function ChatUI({ Layout }) {
 
     api.get(`/messages/${activeId}`)
       .then(res => setMessages(res.data.messages || []))
-      .catch(console.error)
+      .catch(err => setChatError(err.response?.data?.message || 'Unable to load this conversation.'))
       .finally(() => setLoadingMsgs(false));
   }, [activeId]);
 
@@ -206,6 +214,7 @@ export default function ChatUI({ Layout }) {
               </div>
 
               {/* Messages */}
+              {chatError && <div role="alert" style={{ padding:'8px 16px', color:'#b91c1c', background:'#fee2e2', fontSize:13 }}>{chatError}</div>}
               <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {loadingMsgs ? (
                   <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13, marginTop: 40 }}>Loading messages...</div>
@@ -260,6 +269,7 @@ export default function ChatUI({ Layout }) {
               <form onSubmit={send}
                 style={{ padding: '12px 16px', borderTop: '1px solid #e2e8f0', display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
                 <input value={text} onChange={e => setText(e.target.value)}
+                  maxLength={5000}
                   placeholder="Type your message..."
                   style={{ flex: 1, padding: '10px 16px', border: '1.5px solid #e2e8f0', borderRadius: 24, fontSize: 14, outline: 'none', background: '#f8fafc' }} />
                 <button type="submit" className="btn-primary"

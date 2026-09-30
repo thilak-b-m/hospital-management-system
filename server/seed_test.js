@@ -1,6 +1,9 @@
 import dotenv from 'dotenv';
 import path from 'path';
-dotenv.config({ path: path.resolve('server/.env') });
+import { fileURLToPath } from 'url';
+
+const serverDir = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(serverDir, '.env') });
 
 import mongoose from 'mongoose';
 import bcrypt from 'bcrypt';
@@ -14,8 +17,10 @@ import MedicalHistory from './src/models/medicalHistory.js';
 import Report from './src/models/report.js';
 
 const run = async () => {
-  const mongoUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/hms';
-  await mongoose.connect(mongoUri);
+  if (!process.env.TEST_MONGO_URI) {
+    throw new Error('TEST_MONGO_URI is required; point it at an isolated disposable test database.');
+  }
+  await mongoose.connect(process.env.TEST_MONGO_URI);
 
   // Doctor user
   let doctorUser = await User.findOne({ email: 'doctor@citycare.com' });
@@ -61,7 +66,7 @@ const run = async () => {
   }
 
   // Dummy report file
-  const uploadsDir = path.join(process.cwd(), 'uploads');
+  const uploadsDir = path.join(serverDir, 'uploads');
   if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
   const fname = `test-report-${Date.now()}.txt`;
   const fpath = path.join(uploadsDir, fname);

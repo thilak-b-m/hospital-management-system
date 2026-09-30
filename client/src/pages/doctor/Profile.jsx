@@ -40,7 +40,6 @@ export default function DoctorProfile() {
 
   return (
     <DoctorLayout>
-      <div style={{ fontWeight:700, fontSize:20, marginBottom:4 }}>Profile</div>
       <div style={{ color:'#64748b', fontSize:13, marginBottom:20 }}>Manage your profile information</div>
 
       {saved && (

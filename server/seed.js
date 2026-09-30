@@ -5,23 +5,45 @@ import mongoose from "mongoose";
 import bcrypt from "bcrypt";
 import User from "./src/models/user.js";
 
-await mongoose.connect(process.env.MONGO_URI);
+const adminEmail = (process.env.ADMIN_EMAIL || "admin@citycare.com").trim().toLowerCase();
+const adminPassword = process.env.ADMIN_PASSWORD || "CityCareAdmin#2026!";
 
-const existing = await User.findOne({ email: "admin@citycare.com" });
-if (existing) {
-  console.log("Admin already exists:", existing.email);
+if (!process.env.MONGO_URI) {
+  console.error("MONGO_URI is not set. Add it to server/.env before seeding.");
+  process.exitCode = 1;
+} else if (adminPassword.length < 8 || Buffer.byteLength(adminPassword, "utf8") > 72) {
+  console.error("ADMIN_PASSWORD must be 8-72 characters.");
+  process.exitCode = 1;
 } else {
-  const hashed = await bcrypt.hash("Admin@1234", 10);
-  await User.create({
-    name: "Admin User",
-    email: "admin@citycare.com",
-    phone: "9000000000",
-    password: hashed,
-    role: "admin",
-    status: "Active",
-  });
-  console.log("Admin created: admin@citycare.com / Admin@1234");
-}
+  try {
+    await mongoose.connect(process.env.MONGO_URI);
 
-await mongoose.disconnect();
-process.exit(0);
+    const existing = await User.findOne({ email: adminEmail });
+    if (existing && existing.role !== "admin") {
+      throw new Error(`The email ${adminEmail} is already assigned to a non-admin account.`);
+    }
+
+    if (existing) {
+      console.log("Admin already exists:", existing.email);
+    } else {
+      const hashed = await bcrypt.hash(adminPassword, 12);
+      await User.create({
+        name: "CityCare Administrator",
+        email: adminEmail,
+        phone: "9000000000",
+        password: hashed,
+        role: "admin",
+        status: "Active",
+      });
+      console.log(`Admin created: ${adminEmail}`);
+    }
+  } catch (error) {
+    console.error("Admin seeding failed:", error.message);
+    console.error("Check MongoDB credentials, network access, and Atlas IP access list.");
+    process.exitCode = 1;
+  } finally {
+    if (mongoose.connection.readyState !== 0) {
+      await mongoose.disconnect();
+    }
+  }
+}
