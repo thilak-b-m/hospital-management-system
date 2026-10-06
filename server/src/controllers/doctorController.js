@@ -1,6 +1,7 @@
 import Appointment from "../models/appointment.js";
 import Doctor from "../models/doctor.js";
 import Prescription from "../models/prescription.js";
+import { archiveExpiredUnavailableDates } from "../services/doctorAvailabilityService.js";
 
 const getDoctorForUser = async (userId) => Doctor.findOne({ user: userId });
 
@@ -196,6 +197,7 @@ export const getDoctorSchedule = async (req, res) => {
     if (!doctor) {
       return res.status(404).json({ success: false, message: "Doctor profile not found" });
     }
+    await archiveExpiredUnavailableDates(doctor);
 
     const year = parseInt(req.query.year, 10) || new Date().getFullYear();
     const month = parseInt(req.query.month, 10) || new Date().getMonth() + 1;
@@ -262,6 +264,13 @@ export const getDoctorSchedule = async (req, res) => {
         date: normalizeDateString(entry.date),
         reason: entry.reason || "",
       })),
+      unavailableDateHistory: (doctor.unavailableDateHistory || [])
+        .filter((entry) => normalizeDateString(entry.date)?.startsWith(`${year}-${String(month).padStart(2, "0")}`))
+        .map((entry) => ({
+          date: normalizeDateString(entry.date),
+          reason: entry.reason || "",
+          archivedAt: entry.archivedAt,
+        })),
       upcoming: appointments.filter((appt) => new Date(appt.appointmentDate) >= now).slice(0, 20),
     });
   } catch (error) {

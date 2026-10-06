@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 export default function Register() {
   const navigate = useNavigate();
   const { register, loading } = useAuth();
-  const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', confirm: '' });
+  const [form, setForm] = useState({ name: '', email: '', phone: '', dob: '', gender: '', address: '', password: '', confirm: '' });
   const [showPwd, setShowPwd] = useState(false);
   const [error, setError] = useState('');
 
@@ -23,7 +23,15 @@ export default function Register() {
       setError('Password must be at least 8 characters');
       return;
     }
-    const result = await register({ name: form.name, email: form.email, phone: form.phone, password: form.password });
+    const result = await register({
+      name: form.name,
+      email: form.email,
+      phone: form.phone,
+      dob: form.dob,
+      gender: form.gender,
+      address: form.address,
+      password: form.password,
+    });
     if (result.success) {
       navigate('/patient/dashboard');
     } else {
@@ -80,6 +88,25 @@ export default function Register() {
             <div className="form-group">
               <label className="form-label">Phone Number</label>
               <input className="form-input" name="phone" placeholder="Enter your phone number" value={form.phone} onChange={handle} required/>
+            </div>
+            <div className="grid-2">
+              <div className="form-group">
+                <label className="form-label">Date of Birth</label>
+                <input className="form-input" type="date" name="dob" max={new Date().toISOString().split('T')[0]} value={form.dob} onChange={handle} required/>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Gender</label>
+                <select className="form-select" name="gender" value={form.gender} onChange={handle} required>
+                  <option value="">Select gender</option>
+                  <option>Male</option>
+                  <option>Female</option>
+                  <option>Other</option>
+                </select>
+              </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Address</label>
+              <textarea className="form-textarea" name="address" placeholder="Enter your address" value={form.address} onChange={handle} required/>
             </div>
             <div className="form-group">
               <label className="form-label">Password</label>

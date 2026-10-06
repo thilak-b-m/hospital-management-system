@@ -1,10 +1,12 @@
 import Doctor from "../models/doctor.js";
 import Service from "../models/services.js";
+import { archiveExpiredUnavailableDates } from "../services/doctorAvailabilityService.js";
 
 const doctorPopulate = "name email phone role status";
 
 export const getPublicDoctors = async (req, res) => {
   try {
+    await archiveExpiredUnavailableDates();
     const filter = {};
     if (req.query.department) {
       filter.department = req.query.department;
@@ -26,6 +28,7 @@ export const getPublicDoctors = async (req, res) => {
 
 export const getPublicDoctorById = async (req, res) => {
   try {
+    await archiveExpiredUnavailableDates();
     const doctor = await Doctor.findById(req.params.id).populate("user", doctorPopulate);
     if (!doctor || doctor.user?.status !== "Active") {
       return res.status(404).json({ success: false, message: "Doctor not found" });

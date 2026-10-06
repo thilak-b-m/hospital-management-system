@@ -3,6 +3,22 @@ import PatientLayout from '../../components/layout/PatientLayout';
 import { IcoEye, IcoEyeOff } from '../../components/ui/Icons';
 import api from '../../api/axios';
 
+function PasswordField({ label, name, show, showKey, form, handle, toggle }) {
+  return (
+    <div className="form-group">
+      <label className="form-label">{label}</label>
+      <div style={{ position:'relative' }}>
+        <input className="form-input" type={show[showKey] ? 'text' : 'password'}
+          name={name} value={form[name]} onChange={handle} required style={{ paddingRight:42 }}/>
+        <button type="button" onClick={() => toggle(showKey)}
+          style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'#94a3b8', display:'flex' }}>
+          {show[showKey] ? <IcoEyeOff /> : <IcoEye />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function ChangePassword() {
   const [form, setForm] = useState({ currentPassword:'', newPassword:'', confirmPassword:'' });
   const [show, setShow] = useState({ current:false, new:false, confirm:false });
@@ -39,20 +55,6 @@ export default function ChangePassword() {
     }
   };
 
-  const Field = ({ label, name, showKey }) => (
-    <div className="form-group">
-      <label className="form-label">{label}</label>
-      <div style={{ position:'relative' }}>
-        <input className="form-input" type={show[showKey] ? 'text' : 'password'}
-          name={name} value={form[name]} onChange={handle} required style={{ paddingRight:42 }}/>
-        <button type="button" onClick={() => toggle(showKey)}
-          style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'#94a3b8', display:'flex' }}>
-          {show[showKey] ? <IcoEyeOff /> : <IcoEye />}
-        </button>
-      </div>
-    </div>
-  );
-
   return (
     <PatientLayout>
       <div style={{ maxWidth:480, margin:'0 auto' }}>
@@ -74,9 +76,9 @@ export default function ChangePassword() {
           )}
 
           <form onSubmit={submit} style={{ display:'flex', flexDirection:'column', gap:18 }}>
-            <Field label="Current Password"  name="currentPassword"  showKey="current" />
-            <Field label="New Password"      name="newPassword"      showKey="new" />
-            <Field label="Confirm New Password" name="confirmPassword" showKey="confirm" />
+            <PasswordField label="Current Password" name="currentPassword" showKey="current" show={show} form={form} handle={handle} toggle={toggle} />
+            <PasswordField label="New Password" name="newPassword" showKey="new" show={show} form={form} handle={handle} toggle={toggle} />
+            <PasswordField label="Confirm New Password" name="confirmPassword" showKey="confirm" show={show} form={form} handle={handle} toggle={toggle} />
             <button type="submit" className="btn-primary" disabled={loading}
               style={{ width:'100%', justifyContent:'center', padding:'12px', opacity: loading ? 0.7 : 1 }}>
               {loading ? 'Updating...' : 'Update Password'}

@@ -55,11 +55,24 @@ export const registerUser = async (req, res) => {
   try {
     const { name, email, phone, password, dob, gender, address, emergencyContact } = req.body;
 
-    if (!name || !email || !phone || !password) {
+    if (!name || !email || !phone || !password || !dob || !gender || !address) {
       return res.status(400).json({
         success: false,
-        message: "Please provide name, email, phone and password",
+        message: "Please provide name, email, phone, date of birth, gender, address and password",
       });
+    }
+    const dateOfBirth = typeof dob === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dob)
+      ? new Date(`${dob}T00:00:00.000Z`)
+      : null;
+    if (!dateOfBirth || Number.isNaN(dateOfBirth.getTime()) || dateOfBirth.toISOString().slice(0, 10) !== dob
+      || dob > new Date().toISOString().slice(0, 10)) {
+      return res.status(400).json({ success: false, message: "Please provide a valid date of birth that is not in the future." });
+    }
+    if (typeof gender !== "string" || !["Male", "Female", "Other"].includes(gender)) {
+      return res.status(400).json({ success: false, message: "Please select a valid gender." });
+    }
+    if (typeof address !== "string" || !address.trim()) {
+      return res.status(400).json({ success: false, message: "Please provide your address." });
     }
     if (!isPasswordAcceptable(password)) {
       return res.status(400).json({ success: false, message: "Password must be 8-72 characters." });
@@ -82,9 +95,9 @@ export const registerUser = async (req, res) => {
       password: hashedPassword,
       role: "patient",
       patientId,
-      dob,
+      dob: dateOfBirth,
       gender,
-      address,
+      address: address.trim(),
       emergencyContact,
     });
 

@@ -11,6 +11,8 @@ import jwt from "jsonwebtoken";
 import User from "./models/user.js";
 import { canMessageContact } from "./utils/messagingAccess.js";
 import { notifyUser } from "./services/notificationService.js";
+import { archiveExpiredUnavailableDates } from "./services/doctorAvailabilityService.js";
+import { sendAppointmentReminders } from "./services/appointmentReminderService.js";
 import fs from "fs";
 import path from "path";
 import { setSocketServer, addUserSocket, removeUserSocket, getUserSocketIds } from "./socketServer.js";
@@ -143,6 +145,8 @@ io.on("connection", (socket) => {
 });
 
 const PORT = Number(process.env.PORT || 5000);
+let availabilityCleanupTimer;
+let appointmentReminderTimer;
 
 const startServer = async () => {
   if (!process.env.JWT_SECRET) {
@@ -153,15 +157,45 @@ const startServer = async () => {
   }
 
   await connectDB();
+  try {
+    await archiveExpiredUnavailableDates();
+  } catch (error) {
+    console.error("Unavailable-date cleanup failed during startup:", error.message);
+  }
+  try {
+    await sendAppointmentReminders();
+  } catch (error) {
+    console.error("Appointment reminder delivery failed during startup:", error.message);
+  }
   await new Promise((resolve, reject) => {
     httpServer.once("error", reject);
     httpServer.listen(PORT, resolve);
   });
+  const scheduleUnavailableDateCleanup = () => {
+    const now = new Date();
+    const nextUTCMidnight = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+    availabilityCleanupTimer = setTimeout(async () => {
+      try {
+        await archiveExpiredUnavailableDates();
+      } catch (error) {
+        console.error("Unavailable-date cleanup failed:", error.message);
+      }
+      scheduleUnavailableDateCleanup();
+    }, nextUTCMidnight.getTime() - now.getTime());
+  };
+  scheduleUnavailableDateCleanup();
+  appointmentReminderTimer = setInterval(() => {
+    sendAppointmentReminders().catch((error) => {
+      console.error("Appointment reminder delivery failed:", error.message);
+    });
+  }, 15 * 60 * 1000);
   console.log(`Server running on port ${PORT}`);
 };
 
 const shutdown = async (signal) => {
   console.log(`${signal} received; shutting down`);
+  clearInterval(availabilityCleanupTimer);
+  clearInterval(appointmentReminderTimer);
   await new Promise((resolve) => io.close(resolve));
   await mongoose.disconnect();
 };

@@ -23,6 +23,34 @@ function CompletionRing({ pct }) {
   );
 }
 
+function PasswordField({ label, name, show, showKey, form, onChange, onToggle }) {
+  return (
+    <div className="form-group">
+      <label className="form-label">{label}</label>
+      <div style={{ position: 'relative' }}>
+        <input className="form-input" type={show[showKey] ? 'text' : 'password'}
+          name={name} value={form[name]} onChange={onChange} required style={{ paddingRight: 42 }}/>
+        <button type="button" onClick={() => onToggle(showKey)}
+          style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex' }}>
+          {show[showKey] ? <IcoEyeOff /> : <IcoEye />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ProfileAlert({ msg }) {
+  if (!msg) return null;
+  return (
+    <div style={{
+      background: msg.type === 'success' ? '#dcfce7' : '#fee2e2',
+      color: msg.type === 'success' ? '#15803d' : '#dc2626',
+      borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13,
+      border: `1px solid ${msg.type === 'success' ? '#bbf7d0' : '#fecaca'}`,
+    }}>{msg.text}</div>
+  );
+}
+
 export default function MyProfile() {
   const { user, updateUser } = useAuth();
 
@@ -106,29 +134,6 @@ export default function MyProfile() {
     { label: 'Address',       value: form.address, Icon: IcoHome    },
   ];
 
-  const Alert = ({ msg }) => msg ? (
-    <div style={{
-      background: msg.type === 'success' ? '#dcfce7' : '#fee2e2',
-      color: msg.type === 'success' ? '#15803d' : '#dc2626',
-      borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13,
-      border: `1px solid ${msg.type === 'success' ? '#bbf7d0' : '#fecaca'}`,
-    }}>{msg.text}</div>
-  ) : null;
-
-  const PwdField = ({ label, name, showKey }) => (
-    <div className="form-group">
-      <label className="form-label">{label}</label>
-      <div style={{ position: 'relative' }}>
-        <input className="form-input" type={show[showKey] ? 'text' : 'password'}
-          name={name} value={pwdForm[name]} onChange={handlePwd} required style={{ paddingRight: 42 }}/>
-        <button type="button" onClick={() => toggleShow(showKey)}
-          style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex' }}>
-          {show[showKey] ? <IcoEyeOff /> : <IcoEye />}
-        </button>
-      </div>
-    </div>
-  );
-
   return (
     <PatientLayout>
       <div className="grid-2" style={{ alignItems: 'start' }}>
@@ -139,7 +144,7 @@ export default function MyProfile() {
           {/* Personal Information */}
           <div className="card">
             <div className="section-title">Personal Information</div>
-            <Alert msg={profileMsg} />
+            <ProfileAlert msg={profileMsg} />
 
             {!editing ? (
               <>
@@ -216,11 +221,11 @@ export default function MyProfile() {
               <span style={{ color: 'var(--primary)' }}><IcoLock /></span>
               <div className="section-title" style={{ marginBottom: 0 }}>Change Password</div>
             </div>
-            <Alert msg={pwdMsg} />
+            <ProfileAlert msg={pwdMsg} />
             <form onSubmit={savePassword} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <PwdField label="Current Password"      name="currentPassword"  showKey="current" />
-              <PwdField label="New Password"          name="newPassword"      showKey="new" />
-              <PwdField label="Confirm New Password"  name="confirmPassword"  showKey="confirm" />
+              <PasswordField label="Current Password" name="currentPassword" showKey="current" show={show} form={pwdForm} onChange={handlePwd} onToggle={toggleShow} />
+              <PasswordField label="New Password" name="newPassword" showKey="new" show={show} form={pwdForm} onChange={handlePwd} onToggle={toggleShow} />
+              <PasswordField label="Confirm New Password" name="confirmPassword" showKey="confirm" show={show} form={pwdForm} onChange={handlePwd} onToggle={toggleShow} />
               <button type="submit" className="btn-primary" disabled={pwdLoading}
                 style={{ width: '100%', justifyContent: 'center', padding: '11px', opacity: pwdLoading ? 0.7 : 1 }}>
                 {pwdLoading ? 'Updating...' : 'Update Password'}

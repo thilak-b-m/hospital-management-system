@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import DoctorLayout from '../../components/layout/DoctorLayout';
-import { IcoPlus, IcoChevronLeft, IcoChevronRight, IcoCalendar, IcoBan, IcoCheck, IcoTrash } from '../../components/ui/Icons';
+import { IcoPlus, IcoChevronLeft, IcoChevronRight, IcoCalendar, IcoBan, IcoTrash } from '../../components/ui/Icons';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../api/axios';
 import { connectSocket } from '../../utils/socket';
@@ -20,7 +20,7 @@ export default function Schedule() {
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [schedule, setSchedule] = useState({ stats: {}, byDate: {}, daySummary: {}, upcoming: [], unavailableDates: [] });
+  const [schedule, setSchedule] = useState({ stats: {}, byDate: {}, daySummary: {}, upcoming: [], unavailableDates: [], unavailableDateHistory: [] });
   const [loading, setLoading] = useState(true);
   const [addingUnavailable, setAddingUnavailable] = useState(false);
   const [unavailableDateValue, setUnavailableDateValue] = useState('');
@@ -34,6 +34,10 @@ export default function Schedule() {
   const unavailableDateKeys = useMemo(
     () => new Set((schedule.unavailableDates || []).map((entry) => entry.date)),
     [schedule.unavailableDates]
+  );
+  const unavailableHistoryKeys = useMemo(
+    () => new Set((schedule.unavailableDateHistory || []).map((entry) => entry.date)),
+    [schedule.unavailableDateHistory]
   );
 
   const loadSchedule = async (requestedYear = year, requestedMonth = month) => {
@@ -218,6 +222,20 @@ export default function Schedule() {
         </div>
       )}
 
+      {!addingUnavailable && schedule.unavailableDateHistory?.length > 0 && (
+        <div className="card" style={{ marginBottom: 12, padding: '12px 16px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#64748b' }}>Past unavailable dates:</span>
+            {schedule.unavailableDateHistory.slice(0, 6).map((entry) => (
+              <span key={`${entry.date}-${entry.archivedAt}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 999, background: '#fff7ed', color: '#9a3412', fontSize: 12, border: '1px solid #fed7aa' }}>
+                <IcoBan size={12} />
+                <span>{entry.date}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
           <div style={{ display: 'flex', gap: 4, background: '#f1f5f9', borderRadius: 8, padding: 3 }}>
@@ -299,13 +317,14 @@ export default function Schedule() {
               const key = toDateKey(date);
               const summary = schedule.daySummary[key] || { total: 0, confirmed: 0, pending: 0, completed: 0, cancelled: 0 };
               const isSelected = toDateKey(date) === selectedKey;
+              const wasUnavailable = unavailableHistoryKeys.has(key);
               return (
                 <button
                   key={key}
                   onClick={() => setSelectedDate(date)}
                   style={{
-                    background: isSelected ? 'white' : isUnavailableDate(key) ? '#fff1f2' : '#f8fafc',
-                    border: isSelected ? '1px solid rgba(59, 130, 246, 0.25)' : isUnavailableDate(key) ? '1px solid #fca5a5' : '1px solid #e2e8f0',
+                    background: isSelected ? 'white' : isUnavailableDate(key) ? '#fff1f2' : wasUnavailable ? '#fff7ed' : '#f8fafc',
+                    border: isSelected ? '1px solid rgba(59, 130, 246, 0.25)' : isUnavailableDate(key) ? '1px solid #fca5a5' : wasUnavailable ? '1px dashed #fdba74' : '1px solid #e2e8f0',
                     borderRadius: 14,
                     padding: 14,
                     textAlign: 'left',
@@ -320,6 +339,12 @@ export default function Schedule() {
                     <div style={{ marginTop: 6, display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                       <IcoBan size={12} />
                       <span style={{ fontSize: 12, fontWeight: 700, color: '#b91c1c' }}>Unavailable</span>
+                    </div>
+                  )}
+                  {!isUnavailableDate(key) && wasUnavailable && (
+                    <div style={{ marginTop: 6, display: 'inline-flex', gap: 6, alignItems: 'center' }} title="This date was previously blocked and is now archived">
+                      <IcoBan size={12} />
+                      <span style={{ fontSize: 12, fontWeight: 600, color: '#c2410c' }}>Past block</span>
                     </div>
                   )}
                   {summary.confirmed > 0 && !isUnavailableDate(key) && (

@@ -13,6 +13,7 @@ export const notifyUser = async (recipient, details) => {
     emitToUser(payload.recipient, "notification:new", payload);
     return payload;
   } catch (error) {
+    if (error.code === 11000 && details.dedupeKey) return null;
     console.error("Notification creation failed:", error.message);
     return null;
   }

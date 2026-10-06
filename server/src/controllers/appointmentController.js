@@ -7,6 +7,35 @@ import { notifyAdmins, notifyUser } from "../services/notificationService.js";
 
 const doctorPopulate = "name email phone role status";
 const WEEK_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const HOSPITAL_TIME_ZONE = process.env.HOSPITAL_TIME_ZONE || "Asia/Kolkata";
+
+const getHospitalDateTime = (date = new Date()) => {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: HOSPITAL_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return {
+    date: `${values.year}-${values.month}-${values.day}`,
+    minutes: Number(values.hour) * 60 + Number(values.minute),
+  };
+};
+
+const parseAppointmentTime = (time) => {
+  const match = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(time.trim());
+  if (!match) return null;
+  let hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours < 1 || hours > 12 || minutes > 59) return null;
+  if (match[3].toUpperCase() === "PM" && hours !== 12) hours += 12;
+  if (match[3].toUpperCase() === "AM" && hours === 12) hours = 0;
+  return hours * 60 + minutes;
+};
 
 const withAppointmentRelations = (query) =>
   query
@@ -27,8 +56,21 @@ export const createAppointment = async (req, res) => {
   try {
     const { doctorId, appointmentDate, appointmentTime, symptoms = "", patientId } = req.body;
 
-    if (!appointmentDate || !appointmentTime) {
+    if (typeof appointmentDate !== "string" || typeof appointmentTime !== "string" || !appointmentDate || !appointmentTime) {
       return res.status(400).json({ success: false, message: "Please provide appointment date and appointment time" });
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(appointmentDate)) {
+      return res.status(400).json({ success: false, message: "Invalid appointment date. Please use YYYY-MM-DD." });
+    }
+    const appointmentDateObj = new Date(`${appointmentDate}T00:00:00.000Z`);
+    if (Number.isNaN(appointmentDateObj.getTime()) || appointmentDateObj.toISOString().slice(0, 10) !== appointmentDate) {
+      return res.status(400).json({ success: false, message: "Invalid appointment date. Please choose a real calendar date." });
+    }
+    const appointmentDateKey = appointmentDate;
+    const hospitalNow = getHospitalDateTime();
+    if (appointmentDateKey < hospitalNow.date) {
+      return res.status(400).json({ success: false, message: "Appointment date is in the past. Please choose today or a future date." });
     }
 
     if (!['patient', 'doctor', 'admin'].includes(req.user.role)) {
@@ -51,11 +93,13 @@ export const createAppointment = async (req, res) => {
       return res.status(404).json({ success: false, message: "Doctor not found" });
     }
 
-    const appointmentDateObj = new Date(`${appointmentDate}T00:00:00Z`);
-    if (Number.isNaN(appointmentDateObj.getTime())) {
-      return res.status(400).json({ success: false, message: "Invalid appointment date" });
+    const appointmentTimeMinutes = parseAppointmentTime(appointmentTime);
+    if (appointmentTimeMinutes === null) {
+      return res.status(400).json({ success: false, message: "Please provide a valid appointment time." });
     }
-    const appointmentDateKey = appointmentDateObj.toISOString().split("T")[0];
+    if (appointmentDateKey === hospitalNow.date && appointmentTimeMinutes <= hospitalNow.minutes) {
+      return res.status(400).json({ success: false, message: "Appointment time has already passed. Please choose a future time." });
+    }
 
     const unavailableMatch = (doctor.unavailableDates || []).some((entry) => {
       if (!entry?.date) return false;

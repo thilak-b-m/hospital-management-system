@@ -6,19 +6,25 @@ import api from '../../api/axios';
 
 const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
+function getLocalDateKey(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
 function toSafeDate(dateInput) {
   if (!dateInput) return null;
   if (dateInput instanceof Date) {
     return Number.isNaN(dateInput.getTime()) ? null : dateInput;
   }
-  if (typeof dateInput !== 'string') return null;
+  if (typeof dateInput !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) return null;
   const [y, m, d] = dateInput.split('-').map(Number);
   const date = new Date(y, m - 1, d);
-  return Number.isNaN(date.getTime()) ? null : date;
+  return !Number.isNaN(date.getTime()) && date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d
+    ? date
+    : null;
 }
 
 function parseDateLocal(dateStr) {
-  return toSafeDate(dateStr) || new Date();
+  return toSafeDate(dateStr);
 }
 
 function normalizeDateKey(dateInput) {
@@ -64,7 +70,7 @@ function getUnavailableReason(doctor, dateStr) {
 }
 
 function getAvailableTimesForDoctor(doctor, dateStr) {
-  if (!doctor || !dateStr) return [];
+  if (!doctor || !toSafeDate(dateStr)) return [];
   if (isDateUnavailable(doctor, dateStr)) return [];
   const dayName = DAY_NAMES[parseDateLocal(dateStr).getDay()];
   const slot = doctor.availability?.find(a => a.day === dayName);
@@ -122,7 +128,7 @@ export default function BookAppointment() {
   const availableTimes = getAvailableTimesForDoctor(selectedDoc, form.date);
 
   const isDayOff = (dateStr) => {
-    if (!selectedDoc || !dateStr) return false;
+    if (!selectedDoc || !toSafeDate(dateStr) || dateStr < getLocalDateKey()) return false;
     if (isDateUnavailable(selectedDoc, dateStr)) return true;
     const dayName = DAY_NAMES[parseDateLocal(dateStr).getDay()];
     const slot = selectedDoc.availability?.find(a => a.day === dayName);
@@ -130,12 +136,32 @@ export default function BookAppointment() {
   };
 
   const unavailableReason = getUnavailableReason(selectedDoc, form.date);
+  const dateValidationMessage = !form.date
+    ? ''
+    : !toSafeDate(form.date)
+      ? 'Please enter a valid calendar date.'
+      : form.date < getLocalDateKey()
+        ? 'Past dates cannot be booked. Please choose today or a future date.'
+        : dayOff
+          ? `Doctor is unavailable on this date${unavailableReason ? ` — ${unavailableReason}` : '.'}`
+          : '';
 
-  const handle = e => setForm(p => ({ ...p, [e.target.name]: e.target.value }));
+  const handle = e => {
+    setError('');
+    setForm(p => ({ ...p, [e.target.name]: e.target.value }));
+  };
 
   const submit = async (e) => {
     e.preventDefault();
     setError('');
+    if (!toSafeDate(form.date)) {
+      setError('Please enter a valid appointment date.');
+      return;
+    }
+    if (form.date < getLocalDateKey()) {
+      setError('Past dates cannot be booked. Please choose today or a future date.');
+      return;
+    }
     if (isDayOff(form.date)) {
       setError('The doctor is not available on the selected day. Please choose another date.');
       return;
@@ -199,10 +225,12 @@ export default function BookAppointment() {
             <div className="form-group">
               <label className="form-label">Appointment Date</label>
               <input className="form-input" type="date" name="date" value={form.date}
-                min={new Date().toISOString().split('T')[0]} onChange={handle} required/>
-              {form.date && dayOff && (
-                <div style={{ marginTop: 6, fontSize: 12, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <IcoBan /> Doctor is not available on {DAY_NAMES[parseDateLocal(form.date).getDay()]}s{unavailableReason ? ` — ${unavailableReason}` : ''}
+                min={getLocalDateKey()} onChange={handle} required
+                aria-invalid={Boolean(dateValidationMessage)}
+                style={dateValidationMessage ? { borderColor: '#dc2626', boxShadow: '0 0 0 2px rgba(220, 38, 38, 0.12)' } : undefined}/>
+              {dateValidationMessage && (
+                <div role="alert" style={{ marginTop: 6, fontSize: 13, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <IcoBan /> {dateValidationMessage}
                 </div>
               )}
               {form.date && !dayOff && availableTimes.length > 0 && (
@@ -252,7 +280,7 @@ export default function BookAppointment() {
             </div>
 
             <button type="submit" className="btn-primary"
-              disabled={loading || !doctorId || !form.date || !form.time || dayOff}
+              disabled={loading || !doctorId || !form.date || !form.time || Boolean(dateValidationMessage)}
               style={{ justifyContent: 'center', padding: '12px', opacity: (loading || !form.time || dayOff) ? 0.6 : 1 }}>
               {loading ? 'Booking...' : 'Confirm Appointment'}
             </button>

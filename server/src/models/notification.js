@@ -8,6 +8,7 @@ const notificationSchema = new mongoose.Schema(
     message: { type: String, trim: true, default: "", maxlength: 500 },
     link: { type: String, trim: true, default: "" },
     metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
+    dedupeKey: { type: String, trim: true, unique: true, sparse: true },
     readAt: { type: Date, default: null },
   },
   { timestamps: true }
