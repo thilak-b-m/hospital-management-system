@@ -45,6 +45,13 @@ Open the URL printed by Vite, usually `http://localhost:5173`. The API runs on p
 
 The API only begins listening after MongoDB connects. Use `/health/live` for process liveness and `/health/ready` for database readiness; readiness returns HTTP 503 until the database is connected.
 
+## Patient Appointments and Profiles
+
+- Appointment booking only accepts today or a future date. Past dates are rejected by both the booking form and API; booking a slot that has already passed today is also rejected. The API uses `Asia/Kolkata` as its hospital time zone by default. Set `HOSPITAL_TIME_ZONE` in `server/.env` to an IANA time zone identifier if the hospital is in another time zone.
+- Doctors can block dates from their schedule. Expired blocked dates are removed from the active blocked list and retained as past-block history in the calendar.
+- Patients receive in-app notifications on the day before and the day of appointments that are pending or confirmed. These reminders appear in the application notification center; they are not email or SMS messages.
+- Patient signup collects date of birth, gender, and address. Patients can review and update these details in their profile.
+
 ## Initial Admin Login
 
 | Field | Value |
